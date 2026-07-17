@@ -28,10 +28,24 @@ export interface BuiltBlaster {
   dispose(): void
 }
 
-const ATTACH_SLOTS: SlotType[] = ['barrel', 'sight']
+// 몸통 소켓에 직접 부착하는 슬롯 (머즐은 배럴 끝 승계라 별도 처리)
+const ATTACH_SLOTS: SlotType[] = ['barrel', 'sight', 'grip', 'stock']
+
+function attachTo(
+  anchor: THREE.Object3D,
+  inst: { partId: string; morph: import('./types.ts').MorphState; paint: PartPaint },
+  lod: 'drag' | 'full' | undefined,
+): BuiltPart {
+  const built = buildPart(inst.partId, { morph: inst.morph, lod })
+  applyPaint(built, inst.paint)
+  anchor.add(built.group)
+  built.group.position.set(0, 0, 0)
+  return built
+}
 
 /**
  * 조립 전체 빌드. 몸통 → 앵커에 자식 파츠 부착(anchor.add + 원점 고정, attach() 금지, 09 §3.3) → 페인트.
+ * 머즐은 배럴이 있으면 배럴 끝 앵커에, 없으면 몸통 앞 앵커에 부착 (R3).
  */
 export function buildBlaster(
   blaster: Blaster,
@@ -53,11 +67,14 @@ export function buildBlaster(
     const inst = blaster.parts[slot]
     const anchor = bodyBuilt.anchors[slot]
     if (!inst || !anchor) continue
-    const built = buildPart(inst.partId, { morph: inst.morph, lod })
-    applyPaint(built, inst.paint)
-    anchor.add(built.group)
-    built.group.position.set(0, 0, 0)
-    parts[slot] = built
+    parts[slot] = attachTo(anchor, inst, lod)
+  }
+
+  // 머즐 — 배럴 끝 앵커 우선, 없으면 몸통 앞 앵커
+  const muzzleInst = blaster.parts.muzzle
+  if (muzzleInst) {
+    const muzzleAnchor = parts.barrel?.anchors.muzzle ?? bodyBuilt.anchors.muzzle
+    if (muzzleAnchor) parts.muzzle = attachTo(muzzleAnchor, muzzleInst, lod)
   }
 
   return {

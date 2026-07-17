@@ -125,10 +125,11 @@ body {
 }
 .slot-tabs {
   display: flex;
+  flex-wrap: wrap;
   gap: 8px;
 }
 .slot-tab {
-  flex: 1;
+  flex: 1 1 28%;
   border: 2px solid var(--panel-line);
   background: #f4f8fc;
   border-radius: 12px;

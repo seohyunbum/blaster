@@ -6,7 +6,7 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js'
 import type { Blaster, MorphKey, MorphState, SlotType } from './game/types.ts'
 import { computeStats } from './game/parts.ts'
 import { boreScaleFromMorph } from './game/morph.ts'
-import { toShotProfile } from './game/ballistics.ts'
+import { toShotProfile, PROJECTILE_GRAVITY } from './game/ballistics.ts'
 import { buildBlaster, type BuiltBlaster } from './game/assembly.ts'
 import { installEnvironment } from './game/materials.ts'
 import { RangeController } from './game/range.ts'
@@ -364,6 +364,10 @@ let aimYaw = 0
 let aimPitch = 0
 let recoilPitch = 0
 let balloonHits = 0
+let guideSpeed = 30
+let guideGravity = 4
+const _gDir = new THREE.Vector3()
+const _gOrigin = new THREE.Vector3()
 const COURSE_ID = 'balloon_yard'
 // 00_DECISIONS: ★1=완주(1발+), ★2=명중 6+, ★3=명중 9 (아이 친화 — 결과는 항상 플러스)
 const STAR_CUTS: [number, number, number] = [1, 6, 9]
@@ -445,7 +449,10 @@ function enterRange(): void {
   rebuildViewmodel()
   const stats = computeStats(active)
   const bore = boreScaleFromMorph(active.parts.barrel?.morph ?? {})
-  rangeHud.setSpread(toShotProfile(stats, bore).spreadDeg)
+  const profile = toShotProfile(stats, bore)
+  rangeHud.setSpread(profile.spreadDeg)
+  guideSpeed = profile.muzzleVelocity
+  guideGravity = PROJECTILE_GRAVITY[profile.kind]
 }
 
 const _aimEuler = new THREE.Euler(0, 0, 0, 'YXZ')
@@ -562,6 +569,10 @@ function tick(): void {
       recoilPitch = Math.max(0, recoilPitch - dt * 2.2)
       composeAim()
     }
+    // 조준 궤적 가이드 갱신 (현재 조준 방향)
+    camera.getWorldDirection(_gDir)
+    _gOrigin.copy(camera.position).addScaledVector(_gDir, 0.5)
+    range.updateGuide(_gOrigin, _gDir, guideSpeed, guideGravity)
     range.update(dt, performance.now())
   } else {
     controls.update()

@@ -15,7 +15,7 @@ function bare(bodyId: string): Blaster {
 
 test('맨몸(body 만) = 몸통 base 그대로', () => {
   const s = computeStats(bare('body_popcorn'))
-  assert.equal(s.power, 2)
+  assert.equal(s.power, 3) // 기본 파워 소폭 상향(2→3)
   assert.equal(s.fireRate, 6)
   assert.equal(s.accuracy, 4)
   assert.equal(s.weight, 2)
@@ -28,13 +28,13 @@ test('파츠 델타 합산 + clamp', () => {
     name: 't',
     createdAt: 0,
     parts: {
-      body: makeInstance('body_bulldog'), // P4 R4 A5 W4
+      body: makeInstance('body_bulldog'), // P5 R4 A5 W4 (기본 파워 상향)
       barrel: makeInstance('barrel_rail'), // +P2 -R1 +A3 +W2
       sight: makeInstance('sight_dot'), // +A2 +W1
     },
   }
   const s = computeStats(b)
-  assert.equal(s.power, 6) // 4+2
+  assert.equal(s.power, 7) // 5+2
   assert.equal(s.fireRate, 3) // 4-1
   assert.equal(s.accuracy, 10) // 5+3+2 clamp10
   assert.equal(s.accuracyRaw, 10)

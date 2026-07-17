@@ -10,17 +10,17 @@ import type {
 } from './types.ts'
 import { morphStateDelta } from './morph.ts'
 
-// ─── 몸통 4종 (M1 = 팝콘·불도그) ─────────────────────────────
+// ─── 몸통 (기본 파워 소폭 상향 반영) ─────────────────────────
 export const BODIES: readonly BodyDef[] = [
   {
     id: 'body_popcorn',
     slot: 'body',
     nameKo: '팝콘 코어',
-    desc: '동글동글 초경량 미니 프레임. 빠르지만 약해요',
+    desc: '동글동글 초경량 미니 프레임. 빠르고 가벼워요',
     delta: {},
-    base: { power: 2, fireRate: 6, accuracy: 4, weight: 2 },
+    base: { power: 3, fireRate: 6, accuracy: 4, weight: 2 },
     weightLimit: 6,
-    sockets: ['barrel', 'sight', 'grip', 'magazine'],
+    sockets: ['barrel', 'sight', 'grip', 'stock', 'muzzle'],
   },
   {
     id: 'body_bulldog',
@@ -28,14 +28,35 @@ export const BODIES: readonly BodyDef[] = [
     nameKo: '불도그 코어',
     desc: '뭐든 잘 어울리는 만능 중형 프레임',
     delta: {},
-    base: { power: 4, fireRate: 4, accuracy: 5, weight: 4 },
+    base: { power: 5, fireRate: 4, accuracy: 5, weight: 4 },
     weightLimit: 9,
-    sockets: ['barrel', 'sight', 'stock', 'muzzle', 'grip', 'magazine'],
+    sockets: ['barrel', 'sight', 'grip', 'stock', 'muzzle'],
+  },
+  {
+    id: 'body_titan',
+    slot: 'body',
+    nameKo: '타이탄 코어',
+    desc: '묵직한 대형 프레임. 세게, 정확하게, 느리게',
+    delta: {},
+    base: { power: 7, fireRate: 2, accuracy: 6, weight: 6 },
+    weightLimit: 12,
+    sockets: ['barrel', 'sight', 'grip', 'stock', 'muzzle'],
+  },
+  {
+    id: 'body_jelly',
+    slot: 'body',
+    nameKo: '젤리 코어',
+    desc: '말랑말랑 젤리 질감의 괴짜 프레임',
+    delta: {},
+    base: { power: 4, fireRate: 5, accuracy: 3, weight: 3 },
+    weightLimit: 8,
+    sockets: ['barrel', 'sight', 'grip', 'stock', 'muzzle'],
   },
 ]
 
-// ─── 부착 파츠 (M1 = 배럴 2 + 도트 사이트) ────────────────────
+// ─── 부착 파츠 (배럴·조준기·그립·스톡·머즐) ──────────────────
 export const PARTS: readonly PartDef[] = [
+  // 배럴 5종
   {
     id: 'barrel_snap',
     slot: 'barrel',
@@ -51,11 +72,106 @@ export const PARTS: readonly PartDef[] = [
     delta: { power: 2, fireRate: -1, accuracy: 3, weight: 2 },
   },
   {
+    id: 'barrel_stub',
+    slot: 'barrel',
+    nameKo: '뭉툭 포',
+    desc: '짧고 두툼한 포신. 한 방이 묵직해요',
+    delta: { power: 2, accuracy: -1, weight: 1 },
+  },
+  {
+    id: 'barrel_spiral',
+    slot: 'barrel',
+    nameKo: '스파이럴 배럴',
+    desc: '나선 홈이 파인 배럴. 똑바로 잘 날아가요',
+    delta: { power: 1, accuracy: 2, weight: 2 },
+  },
+  {
+    id: 'barrel_wide',
+    slot: 'barrel',
+    nameKo: '와이드 배럴',
+    desc: '입구가 넓은 배럴. 큼직한 발사체가 나가요',
+    delta: { power: 2, fireRate: -1, weight: 1 },
+  },
+  // 조준기 3종
+  {
     id: 'sight_dot',
     slot: 'sight',
     nameKo: '도트 사이트',
     desc: '빨간 점이 반짝이는 도트',
     delta: { accuracy: 2, weight: 1 },
+  },
+  {
+    id: 'sight_pin',
+    slot: 'sight',
+    nameKo: '가늠 핀',
+    desc: '클래식한 가늠 핀',
+    delta: { accuracy: 1 },
+  },
+  {
+    id: 'sight_ring',
+    slot: 'sight',
+    nameKo: '링 사이트',
+    desc: '동그란 고리로 겨누는 사이트',
+    delta: { accuracy: 2 },
+  },
+  // 그립 2종
+  {
+    id: 'grip_mini',
+    slot: 'grip',
+    nameKo: '미니 그립',
+    desc: '손에 착 감기는 앞손잡이',
+    delta: { fireRate: 1 },
+  },
+  {
+    id: 'grip_banana',
+    slot: 'grip',
+    nameKo: '바나나 그립',
+    desc: '바나나 모양. 웃긴데 성능도 좋아요',
+    delta: { fireRate: 1, accuracy: 1, weight: 1 },
+  },
+  // 스톡 3종
+  {
+    id: 'stock_pad',
+    slot: 'stock',
+    nameKo: '숄더 패드',
+    desc: '폭신한 어깨 받침. 안정감 최고',
+    delta: { accuracy: 1, weight: 1 },
+  },
+  {
+    id: 'stock_spring',
+    slot: 'stock',
+    nameKo: '스프링 스톡',
+    desc: '반동을 튕겨내는 스프링 스톡',
+    delta: { fireRate: 1, weight: 1 },
+  },
+  {
+    id: 'stock_balloon',
+    slot: 'stock',
+    nameKo: '풍선 스톡',
+    desc: '풍선이라 가벼워요! 대신 흔들흔들',
+    delta: { weight: -1, accuracy: -1 },
+  },
+  // 머즐 3종 (배럴 끝에 붙음)
+  {
+    id: 'muzzle_horn',
+    slot: 'muzzle',
+    nameKo: '나팔 팁',
+    desc: '나팔 모양 총구 장식. 발사가 신나 보여요',
+    delta: {},
+  },
+  {
+    id: 'muzzle_booster',
+    slot: 'muzzle',
+    nameKo: '부스터 콘',
+    desc: '로켓 노즐 모양 파워 부스터',
+    delta: { power: 2, accuracy: -1, weight: 1 },
+  },
+  {
+    id: 'muzzle_star',
+    slot: 'muzzle',
+    nameKo: '반짝이 팁',
+    desc: '반짝반짝 별 모양 팁',
+    delta: {},
   },
 ]
 
@@ -68,14 +184,8 @@ export const BODY_MAP: ReadonlyMap<PartId, BodyDef> = new Map<PartId, BodyDef>(
   BODIES.map((b) => [b.id, b]),
 )
 
-/** M1 시작 세트 — 전 5종 즉시 사용(자유로운 창작 우선, 별 해금은 후속 마일스톤). */
-export const STARTER_PART_IDS: readonly PartId[] = [
-  'body_popcorn',
-  'body_bulldog',
-  'barrel_snap',
-  'barrel_rail',
-  'sight_dot',
-]
+/** M1 시작 세트 — 전 파츠 즉시 사용(자유로운 창작 우선, 별 해금은 후속 마일스톤). */
+export const STARTER_PART_IDS: readonly PartId[] = [...BODIES, ...PARTS].map((p) => p.id)
 
 export function partsForSlot(slot: SlotType): PartDef[] {
   if (slot === 'body') return [...BODIES]
@@ -97,7 +207,7 @@ function clampStat(n: number): number {
  */
 export function computeStats(blaster: Blaster): BlasterStats {
   const body = bodyOf(blaster)
-  const base = body?.base ?? { power: 3, fireRate: 4, accuracy: 4, weight: 3 }
+  const base = body?.base ?? { power: 4, fireRate: 4, accuracy: 4, weight: 3 }
 
   let power = base.power
   let fireRate = base.fireRate

@@ -28,6 +28,8 @@ interface BodyDims {
 const BODY_DIMS: Record<string, BodyDims> = {
   body_popcorn: { w: 0.14, h: 0.16, d: 0.44 },
   body_bulldog: { w: 0.17, h: 0.19, d: 0.5 },
+  body_titan: { w: 0.2, h: 0.22, d: 0.58 },
+  body_jelly: { w: 0.16, h: 0.18, d: 0.4 },
 }
 interface BarrelDims {
   r: number
@@ -36,6 +38,9 @@ interface BarrelDims {
 const BARREL_DIMS: Record<string, BarrelDims> = {
   barrel_snap: { r: 0.035, l: 0.18 },
   barrel_rail: { r: 0.038, l: 0.4 },
+  barrel_stub: { r: 0.05, l: 0.16 },
+  barrel_spiral: { r: 0.04, l: 0.32 },
+  barrel_wide: { r: 0.058, l: 0.22 },
 }
 
 function segFor(lod: 'drag' | 'full' | undefined, full: number, drag: number): number {
@@ -113,11 +118,26 @@ function buildBody(partId: PartId, opts: BuildOpts): BuiltPart {
   const sightAnchor = new THREE.Object3D()
   sightAnchor.position.set(0, h * 0.5 + 0.01, -d * 0.08)
   group.add(sightAnchor)
+  const gripAnchor = new THREE.Object3D()
+  gripAnchor.position.set(0, -h * 0.5, d * 0.1)
+  group.add(gripAnchor)
+  const stockAnchor = new THREE.Object3D()
+  stockAnchor.position.set(0, 0, halfZ)
+  group.add(stockAnchor)
+  const muzzleAnchor = new THREE.Object3D() // 배럴 없을 때 폴백
+  muzzleAnchor.position.set(0, h * 0.08, -halfZ - noseLen)
+  group.add(muzzleAnchor)
 
   return {
     group,
     zones: { primary, secondary, accent },
-    anchors: { barrel: barrelAnchor, sight: sightAnchor },
+    anchors: {
+      barrel: barrelAnchor,
+      sight: sightAnchor,
+      grip: gripAnchor,
+      stock: stockAnchor,
+      muzzle: muzzleAnchor,
+    },
     dispose: () => geos.forEach((g) => g.dispose()),
   }
 }
@@ -166,18 +186,12 @@ function buildBarrel(partId: PartId, opts: BuildOpts): BuiltPart {
 }
 
 // ─── 사이트 (morph 없음) ────────────────────────────────────
-function buildSight(_partId: PartId, opts: BuildOpts): BuiltPart {
+function buildSight(partId: PartId, opts: BuildOpts): BuiltPart {
   const group = new THREE.Group()
   const geos: THREE.BufferGeometry[] = []
   const primary: THREE.Mesh[] = []
   const secondary: THREE.Mesh[] = []
-
-  const bodyGeo = new RoundedBoxGeometry(0.05, 0.05, 0.05, 2, 0.012)
-  geos.push(bodyGeo)
-  const box = new THREE.Mesh(bodyGeo, fixedMaterial(PLACEHOLDER))
-  box.position.set(0, 0.03, 0)
-  primary.push(box)
-  group.add(box)
+  const seg = segFor(opts.lod, 12, 8)
 
   const mountGeo = new THREE.BoxGeometry(0.045, 0.02, 0.06)
   geos.push(mountGeo)
@@ -186,17 +200,179 @@ function buildSight(_partId: PartId, opts: BuildOpts): BuiltPart {
   secondary.push(mount)
   group.add(mount)
 
-  // 발광 dot — 고정(비색칠)
-  const seg = segFor(opts.lod, 12, 8)
-  const dotGeo = new THREE.SphereGeometry(0.008, seg, seg)
-  geos.push(dotGeo)
-  const dot = new THREE.Mesh(dotGeo, glowMaterial(0xff3b3b))
-  dot.position.set(0, 0.03, -0.026)
-  group.add(dot)
+  if (partId === 'sight_pin') {
+    // 가늠 핀 — 얇은 기둥
+    const postGeo = new THREE.CylinderGeometry(0.005, 0.007, 0.05, seg)
+    geos.push(postGeo)
+    const post = new THREE.Mesh(postGeo, fixedMaterial(PLACEHOLDER))
+    post.position.set(0, 0.03, -0.02)
+    primary.push(post)
+    group.add(post)
+  } else if (partId === 'sight_ring') {
+    // 링 사이트 — 고리
+    const ringGeo = new THREE.TorusGeometry(0.022, 0.005, 8, seg)
+    geos.push(ringGeo)
+    const ring = new THREE.Mesh(ringGeo, fixedMaterial(PLACEHOLDER))
+    ring.position.set(0, 0.035, 0)
+    primary.push(ring)
+    group.add(ring)
+  } else {
+    // 도트 사이트 — 박스 + 발광 점(고정 비색칠)
+    const boxGeo = new RoundedBoxGeometry(0.05, 0.05, 0.05, 2, 0.012)
+    geos.push(boxGeo)
+    const box = new THREE.Mesh(boxGeo, fixedMaterial(PLACEHOLDER))
+    box.position.set(0, 0.03, 0)
+    primary.push(box)
+    group.add(box)
+    const dotGeo = new THREE.SphereGeometry(0.008, seg, seg)
+    geos.push(dotGeo)
+    const dot = new THREE.Mesh(dotGeo, glowMaterial(0xff3b3b))
+    dot.position.set(0, 0.03, -0.026)
+    group.add(dot)
+  }
 
   return {
     group,
     zones: { primary, secondary },
+    anchors: {},
+    dispose: () => geos.forEach((g) => g.dispose()),
+  }
+}
+
+// ─── 그립 (morph 없음) ──────────────────────────────────────
+function buildGrip(partId: PartId, opts: BuildOpts): BuiltPart {
+  const group = new THREE.Group()
+  const geos: THREE.BufferGeometry[] = []
+  const primary: THREE.Mesh[] = []
+  const accent: THREE.Mesh[] = []
+  const seg = segFor(opts.lod, 10, 6)
+  const banana = partId === 'grip_banana'
+
+  const gripGeo = new THREE.CapsuleGeometry(banana ? 0.026 : 0.024, 0.09, 3, seg)
+  geos.push(gripGeo)
+  const g = new THREE.Mesh(gripGeo, fixedMaterial(PLACEHOLDER))
+  g.rotation.x = (banana ? 0.4 : 0.26) // 아래로 기울임
+  g.position.set(0, -0.06, 0.01)
+  primary.push(g)
+  group.add(g)
+
+  for (let i = 0; i < 2; i++) {
+    const kGeo = new THREE.TorusGeometry(0.026, 0.005, 6, seg)
+    geos.push(kGeo)
+    const k = new THREE.Mesh(kGeo, fixedMaterial(PLACEHOLDER))
+    k.rotation.y = Math.PI / 2
+    k.position.set(0, -0.04 - i * 0.035, 0.02)
+    accent.push(k)
+    group.add(k)
+  }
+
+  return {
+    group,
+    zones: { primary, accent },
+    anchors: {},
+    dispose: () => geos.forEach((geo) => geo.dispose()),
+  }
+}
+
+// ─── 스톡 (morph 없음) ──────────────────────────────────────
+function buildStock(partId: PartId, opts: BuildOpts): BuiltPart {
+  const group = new THREE.Group()
+  const geos: THREE.BufferGeometry[] = []
+  const primary: THREE.Mesh[] = []
+  const secondary: THREE.Mesh[] = []
+  const seg = segFor(opts.lod, 12, 8)
+
+  if (partId === 'stock_balloon') {
+    // 풍선 스톡 — 큰 구 (뒤로 매달림)
+    const balloonGeo = new THREE.SphereGeometry(0.075, seg, seg)
+    geos.push(balloonGeo)
+    const b = new THREE.Mesh(balloonGeo, fixedMaterial(PLACEHOLDER))
+    b.scale.set(1, 1.1, 1.2)
+    b.position.set(0, 0.0, 0.14)
+    primary.push(b)
+    group.add(b)
+  } else {
+    const armGeo = new THREE.BoxGeometry(0.05, 0.05, 0.14)
+    geos.push(armGeo)
+    const arm = new THREE.Mesh(armGeo, fixedMaterial(PLACEHOLDER))
+    arm.position.set(0, 0.0, 0.09)
+    primary.push(arm)
+    group.add(arm)
+    const padGeo = new RoundedBoxGeometry(0.055, 0.1, 0.04, 2, 0.015)
+    geos.push(padGeo)
+    const pad = new THREE.Mesh(padGeo, fixedMaterial(PLACEHOLDER))
+    pad.position.set(0, 0.0, 0.17)
+    secondary.push(pad)
+    group.add(pad)
+  }
+
+  return {
+    group,
+    zones: { primary, secondary },
+    anchors: {},
+    dispose: () => geos.forEach((g) => g.dispose()),
+  }
+}
+
+// ─── 머즐 (배럴 끝에 부착, -Z 로 뻗음) ──────────────────────
+function buildMuzzle(partId: PartId, opts: BuildOpts): BuiltPart {
+  const group = new THREE.Group()
+  const geos: THREE.BufferGeometry[] = []
+  const primary: THREE.Mesh[] = []
+  const accent: THREE.Mesh[] = []
+  const seg = segFor(opts.lod, 14, 8)
+
+  if (partId === 'muzzle_booster') {
+    const coneGeo = new THREE.CylinderGeometry(0.055, 0.04, 0.08, seg)
+    coneGeo.rotateX(Math.PI / 2)
+    geos.push(coneGeo)
+    const cone = new THREE.Mesh(coneGeo, fixedMaterial(PLACEHOLDER))
+    cone.position.set(0, 0, -0.04)
+    primary.push(cone)
+    group.add(cone)
+    for (let i = 0; i < 3; i++) {
+      const finGeo = new THREE.BoxGeometry(0.012, 0.05, 0.06)
+      geos.push(finGeo)
+      const fin = new THREE.Mesh(finGeo, fixedMaterial(PLACEHOLDER))
+      fin.position.set(0, 0, -0.04)
+      fin.rotation.z = (i / 3) * Math.PI * 2
+      accent.push(fin)
+      group.add(fin)
+    }
+  } else if (partId === 'muzzle_star') {
+    const baseGeo = new THREE.CylinderGeometry(0.035, 0.035, 0.04, seg)
+    baseGeo.rotateX(Math.PI / 2)
+    geos.push(baseGeo)
+    const base = new THREE.Mesh(baseGeo, fixedMaterial(PLACEHOLDER))
+    base.position.set(0, 0, -0.02)
+    primary.push(base)
+    group.add(base)
+    const starGeo = new THREE.OctahedronGeometry(0.035, 0)
+    geos.push(starGeo)
+    const star = new THREE.Mesh(starGeo, fixedMaterial(PLACEHOLDER))
+    star.position.set(0, 0, -0.06)
+    accent.push(star)
+    group.add(star)
+  } else {
+    // 나팔 팁 — 트럼펫 모양 flare
+    const hornGeo = new THREE.CylinderGeometry(0.06, 0.035, 0.08, seg, 1, true)
+    hornGeo.rotateX(Math.PI / 2)
+    geos.push(hornGeo)
+    const horn = new THREE.Mesh(hornGeo, fixedMaterial(PLACEHOLDER))
+    horn.position.set(0, 0, -0.04)
+    primary.push(horn)
+    group.add(horn)
+    const lipGeo = new THREE.TorusGeometry(0.06, 0.008, 8, seg)
+    geos.push(lipGeo)
+    const lip = new THREE.Mesh(lipGeo, fixedMaterial(PLACEHOLDER))
+    lip.position.set(0, 0, -0.08)
+    accent.push(lip)
+    group.add(lip)
+  }
+
+  return {
+    group,
+    zones: { primary, accent },
     anchors: {},
     dispose: () => geos.forEach((g) => g.dispose()),
   }
@@ -222,6 +398,9 @@ export function buildPart(partId: PartId, opts: BuildOpts): BuiltPart {
   if (partId.startsWith('body_')) return buildBody(partId, opts)
   if (partId.startsWith('barrel_')) return buildBarrel(partId, opts)
   if (partId.startsWith('sight_')) return buildSight(partId, opts)
+  if (partId.startsWith('grip_')) return buildGrip(partId, opts)
+  if (partId.startsWith('stock_')) return buildStock(partId, opts)
+  if (partId.startsWith('muzzle_')) return buildMuzzle(partId, opts)
   return buildFallback()
 }
 

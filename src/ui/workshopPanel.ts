@@ -17,6 +17,9 @@ const SLOT_TABS: { slot: SlotType; label: string }[] = [
   { slot: 'body', label: '몸통' },
   { slot: 'barrel', label: '배럴' },
   { slot: 'sight', label: '조준기' },
+  { slot: 'grip', label: '그립' },
+  { slot: 'stock', label: '스톡' },
+  { slot: 'muzzle', label: '총구' },
 ]
 
 const STAT_ROWS: { key: keyof BlasterStats; label: string }[] = [
@@ -109,8 +112,7 @@ export function createWorkshopPanel(root: HTMLElement, cb: WorkshopCallbacks) {
     if (!inst || !arche) {
       const hint = document.createElement('p')
       hint.className = 'morph-hint'
-      hint.textContent =
-        activeSlot === 'sight' ? '조준기는 모양을 바꿀 수 없어요' : '먼저 파츠를 골라요'
+      hint.textContent = !inst ? '먼저 파츠를 골라요' : '이 파츠는 모양을 바꿀 수 없어요'
       morphWrap.appendChild(hint)
       return
     }

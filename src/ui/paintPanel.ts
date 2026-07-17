@@ -74,12 +74,21 @@ export function createPaintPanel(root: HTMLElement, cb: PaintCallbacks) {
 
   function slotsOfBlaster(): SlotType[] {
     if (!blaster) return []
-    return (['body', 'barrel', 'sight'] as SlotType[]).filter((s) => blaster!.parts[s])
+    return (['body', 'barrel', 'sight', 'grip', 'stock', 'muzzle'] as SlotType[]).filter(
+      (s) => blaster!.parts[s],
+    )
   }
 
   function renderPartTabs(): void {
     partTabs.innerHTML = ''
-    const names: Record<string, string> = { body: '몸통', barrel: '배럴', sight: '조준기' }
+    const names: Record<string, string> = {
+      body: '몸통',
+      barrel: '배럴',
+      sight: '조준기',
+      grip: '그립',
+      stock: '스톡',
+      muzzle: '총구',
+    }
     for (const s of slotsOfBlaster()) {
       const b = document.createElement('button')
       b.className = 'slot-tab' + (s === activeSlot ? ' active' : '')

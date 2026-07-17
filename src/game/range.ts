@@ -12,7 +12,8 @@ import { fixedMaterial, paintMaterial } from './materials.ts'
 
 const POOL_SIZE = 64
 const CONFETTI_MAX = 240
-const ASSIST_RADIUS_MUL = 1.25 // M1 데스크톱 어시스트 (04 §8 ①)
+const ASSIST_RADIUS_MUL = 1.7 // 데스크톱 어시스트 — 아이 친화로 상향 (04 §8 ①)
+const GUIDE_DOTS = 18 // 탄착 궤적 가이드 점
 const GROUND_Y = 0
 
 export type HitKind = 'board' | 'balloon'
@@ -70,6 +71,7 @@ export class RangeController {
   private confLife: number[] = []
   private confActive: boolean[] = []
   private confHead = 0
+  private guide: THREE.InstancedMesh
   onHit: ((e: HitEvent) => void) | null = null
 
   constructor() {
@@ -115,6 +117,54 @@ export class RangeController {
     }
     this.confetti.instanceMatrix.needsUpdate = true
     this.group.add(this.confetti)
+
+    // 탄착 궤적 가이드 (밝은 점 — draw call 1)
+    const guideGeo = new THREE.SphereGeometry(0.05, 8, 6)
+    const guideMat = new THREE.MeshBasicMaterial({
+      color: 0xffe14d,
+      transparent: true,
+      opacity: 0.85,
+    })
+    this.guide = new THREE.InstancedMesh(guideGeo, guideMat, GUIDE_DOTS)
+    this.guide.count = GUIDE_DOTS
+    for (let i = 0; i < GUIDE_DOTS; i++) {
+      _dummy.position.set(0, -999, 0)
+      _dummy.updateMatrix()
+      this.guide.setMatrixAt(i, _dummy.matrix)
+    }
+    this.guide.instanceMatrix.needsUpdate = true
+    this.group.add(this.guide)
+  }
+
+  /** 현재 조준의 예상 포물선 위에 가이드 점을 배치 (조준 보조). */
+  updateGuide(origin: THREE.Vector3, dir: THREE.Vector3, speed: number, gravity: number): void {
+    let px = origin.x
+    let py = origin.y
+    let pz = origin.z
+    let vx = dir.x * speed
+    let vy = dir.y * speed
+    let vz = dir.z * speed
+    const sub = 3
+    const h = 0.05 / sub // 점 간격 0.05초
+    for (let i = 0; i < GUIDE_DOTS; i++) {
+      for (let s = 0; s < sub; s++) {
+        vy -= gravity * h
+        px += vx * h
+        py += vy * h
+        pz += vz * h
+      }
+      if (py < GROUND_Y) {
+        _dummy.position.set(0, -999, 0)
+        _dummy.scale.setScalar(0.0001)
+      } else {
+        _dummy.position.set(px, py, pz)
+        _dummy.scale.setScalar(1 - i / (GUIDE_DOTS * 1.6)) // 멀수록 작게
+      }
+      _dummy.rotation.set(0, 0, 0)
+      _dummy.updateMatrix()
+      this.guide.setMatrixAt(i, _dummy.matrix)
+    }
+    this.guide.instanceMatrix.needsUpdate = true
   }
 
   private buildScene(): void {

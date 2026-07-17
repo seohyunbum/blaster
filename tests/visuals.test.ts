@@ -3,7 +3,14 @@ import assert from 'node:assert/strict'
 import { buildPart, countMeshes } from '../src/game/partVisuals.ts'
 import type { MorphKey, MorphState } from '../src/game/types.ts'
 
-const M1_PARTS = ['body_popcorn', 'body_bulldog', 'barrel_snap', 'barrel_rail', 'sight_dot']
+const M1_PARTS = [
+  'body_popcorn', 'body_bulldog', 'body_titan', 'body_jelly',
+  'barrel_snap', 'barrel_rail', 'barrel_stub', 'barrel_spiral', 'barrel_wide',
+  'sight_dot', 'sight_pin', 'sight_ring',
+  'grip_mini', 'grip_banana',
+  'stock_pad', 'stock_spring', 'stock_balloon',
+  'muzzle_horn', 'muzzle_booster', 'muzzle_star',
+]
 const EXTREMES: MorphState[] = [
   {},
   { bodyLength: 0, bodyChub: 0, bodyNose: 0, barrelLength: 0, barrelBore: 0 },
