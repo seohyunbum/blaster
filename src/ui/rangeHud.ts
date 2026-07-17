@@ -4,6 +4,8 @@ import { resultStars } from './stars.ts'
 export interface RangeHudCallbacks {
   onBack: () => void
   onRetry: () => void
+  onToggleScope: () => void
+  onZoomDelta: (delta: number) => void
 }
 
 export function createRangeHud(root: HTMLElement, cb: RangeHudCallbacks) {
@@ -30,8 +32,36 @@ export function createRangeHud(root: HTMLElement, cb: RangeHudCallbacks) {
 
   const hint = document.createElement('div')
   hint.className = 'range-hint'
-  hint.textContent = '화면을 끌어서 조준하고, 눌러서 발사!'
+  hint.textContent = '끌어서 조준 · 눌러서 발사 · 휠이나 조준경으로 확대'
   root.appendChild(hint)
+
+  // 스코프 오버레이 (조준경 ON 일 때 원형 비네트)
+  const scope = document.createElement('div')
+  scope.className = 'scope-overlay hidden'
+  scope.innerHTML =
+    '<div class="scope-ring"></div><div class="scope-cross-v"></div><div class="scope-cross-h"></div>'
+  root.appendChild(scope)
+
+  // 배율 컨트롤
+  const zoomCtl = document.createElement('div')
+  zoomCtl.className = 'zoom-control'
+  const scopeBtn = document.createElement('button')
+  scopeBtn.className = 'scope-btn'
+  scopeBtn.textContent = '조준경'
+  scopeBtn.addEventListener('click', () => cb.onToggleScope())
+  const minus = document.createElement('button')
+  minus.className = 'zoom-step'
+  minus.textContent = '−'
+  minus.addEventListener('click', () => cb.onZoomDelta(-1))
+  const magLabel = document.createElement('div')
+  magLabel.className = 'mag-label'
+  magLabel.textContent = '4배'
+  const plus = document.createElement('button')
+  plus.className = 'zoom-step'
+  plus.textContent = '+'
+  plus.addEventListener('click', () => cb.onZoomDelta(1))
+  zoomCtl.append(scopeBtn, minus, magLabel, plus)
+  root.appendChild(zoomCtl)
 
   const result = document.createElement('div')
   result.className = 'result-overlay hidden'
@@ -53,6 +83,16 @@ export function createRangeHud(root: HTMLElement, cb: RangeHudCallbacks) {
     setSpread(spreadDeg: number): void {
       const size = 18 + spreadDeg * 14
       cross.style.setProperty('--ring-size', `${size}px`)
+    },
+    /** 조준경 ON/OFF — 스코프 비네트 + 일반 조준점 숨김. */
+    setScope(on: boolean): void {
+      scope.classList.toggle('hidden', !on)
+      scopeBtn.classList.toggle('active', on)
+      cross.style.display = on ? 'none' : ''
+    },
+    /** 현재 배율 표시. */
+    setMag(zoom: number): void {
+      magLabel.textContent = `${zoom}배`
     },
     showResult(stars: 0 | 1 | 2 | 3, hitCount: number): void {
       result.innerHTML =

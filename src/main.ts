@@ -117,6 +117,8 @@ let paintPanel: ReturnType<typeof createPaintPanel> | null = null
 const rangeHud = createRangeHud(hudHost, {
   onBack: () => finishRange(),
   onRetry: () => retryRange(),
+  onToggleScope: () => setScope(!scoped),
+  onZoomDelta: (d) => changeZoom(d),
 })
 
 // ─── 편집 뷰 재빌드 ─────────────────────────────────────────
@@ -165,6 +167,9 @@ function setStation(id: StationId): void {
   hudHost.style.display = id === 'range' ? '' : 'none'
 
   if (editMode) {
+    scoped = false
+    camera.fov = BASE_FOV
+    camera.updateProjectionMatrix()
     camera.position.set(0.55, 0.34, 0.9)
     controls.target.set(0, 0.02, -0.05)
     controls.update()
@@ -357,6 +362,38 @@ let balloonHits = 0
 const COURSE_ID = 'balloon_yard'
 const STAR_CUTS: [number, number, number] = [6, 12, 20]
 
+// ─── 조준경 배율 (4~15배) ───────────────────────────────────
+const BASE_FOV = 45
+const ZOOM_MIN = 4
+const ZOOM_MAX = 15
+let scoped = false
+let zoom = ZOOM_MIN
+
+/** 배율 z 에 대한 광학적 FOV(도). z=1 이면 BASE_FOV. */
+function fovForZoom(z: number): number {
+  const half = (BASE_FOV / 2) * (Math.PI / 180)
+  return (2 * Math.atan(Math.tan(half) / z) * 180) / Math.PI
+}
+
+function applyView(): void {
+  camera.fov = scoped ? fovForZoom(zoom) : BASE_FOV
+  camera.updateProjectionMatrix()
+}
+
+function setScope(on: boolean): void {
+  scoped = on
+  applyView()
+  rangeHud.setScope(on)
+  sfx.click()
+}
+
+function changeZoom(delta: number): void {
+  zoom = Math.max(ZOOM_MIN, Math.min(ZOOM_MAX, zoom + delta))
+  if (!scoped) setScope(true) // 배율 조절 = 조준경 켜기
+  else applyView()
+  rangeHud.setMag(zoom)
+}
+
 range.onHit = (e) => {
   if (e.kind === 'balloon') {
     balloonHits += 1
@@ -377,6 +414,11 @@ function enterRange(): void {
   aimYaw = 0
   aimPitch = 0
   recoilPitch = 0
+  scoped = false
+  zoom = ZOOM_MIN
+  applyView()
+  rangeHud.setScope(false)
+  rangeHud.setMag(zoom)
   camera.position.set(0, 1.5, 0.2)
   composeAim()
   rebuildViewmodel()
@@ -458,8 +500,10 @@ renderer.domElement.addEventListener('pointermove', (ev) => {
   const dx = ev.clientX - downX
   const dy = ev.clientY - downY
   moved = Math.max(moved, Math.hypot(dx, dy))
-  aimYaw -= (ev.movementX || 0) * 0.0032
-  aimPitch -= (ev.movementY || 0) * 0.0032
+  // 조준경 배율만큼 감도를 낮춰 정밀 조준 (fov 비례)
+  const sens = 0.0032 * (scoped ? fovForZoom(zoom) / BASE_FOV : 1)
+  aimYaw -= (ev.movementX || 0) * sens
+  aimPitch -= (ev.movementY || 0) * sens
   aimPitch = Math.max(-0.5, Math.min(0.45, aimPitch))
   composeAim()
 })
@@ -467,6 +511,21 @@ window.addEventListener('pointerup', () => {
   if (station !== 'range' || !pointerDown) return
   pointerDown = false
   if (moved < 8) fire()
+})
+// 휠 = 배율 조절(확대/축소), 우클릭 = 조준경 토글
+renderer.domElement.addEventListener(
+  'wheel',
+  (ev) => {
+    if (station !== 'range') return
+    ev.preventDefault()
+    changeZoom(ev.deltaY < 0 ? 1 : -1)
+  },
+  { passive: false },
+)
+renderer.domElement.addEventListener('contextmenu', (ev) => {
+  if (station !== 'range') return
+  ev.preventDefault()
+  setScope(!scoped)
 })
 
 // ─── 루프 ──────────────────────────────────────────────────
@@ -540,6 +599,9 @@ tick()
     composeAim()
   },
   hits: () => balloonHits,
+  setScope: (on: boolean) => setScope(on),
+  changeZoom: (d: number) => changeZoom(d),
+  zoomState: () => ({ scoped, zoom, fov: Math.round(camera.fov * 100) / 100 }),
   /** QA용 수동 스텝 — 백그라운드 탭 rAF 스로틀 우회. dt 고정 60fps. */
   step: (n = 1) => {
     for (let i = 0; i < n; i++) {
