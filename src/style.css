@@ -397,14 +397,17 @@ body {
 }
 
 /* ── 사격장 HUD ── */
-.hud-host {
-  position: absolute;
-  inset: 60px 0 0 0;
-  pointer-events: none;
-}
+.hud-host,
 .range-hud {
   position: absolute;
-  inset: 0;
+  inset: 60px 0 0 0;
+  /* 오버레이 자체는 클릭을 통과시켜 캔버스가 발사 입력을 받게 한다.
+     상호작용 요소(버튼·배율·결과)만 개별적으로 pointer-events: auto. */
+  pointer-events: none;
+}
+/* 사격장에서는 우측 패널 열을 접어 캔버스를 전체 폭으로 (조준점=캔버스 중앙) */
+#app.range-mode {
+  grid-template-columns: 1fr 0;
 }
 .crosshair {
   position: absolute;

@@ -2,8 +2,9 @@
 import { resultStars } from './stars.ts'
 
 export interface RangeHudCallbacks {
-  onBack: () => void
-  onRetry: () => void
+  onBack: () => void // 상단 "공방으로" — 라운드 종료(결과 표시)
+  onRetry: () => void // 결과 카드 "한 번 더"
+  onExit: () => void // 결과 카드 "공방으로" — 공방으로 실제 이동
   onToggleScope: () => void
   onZoomDelta: (delta: number) => void
 }
@@ -111,7 +112,7 @@ export function createRangeHud(root: HTMLElement, cb: RangeHudCallbacks) {
       })
       result.querySelector('.result-back')?.addEventListener('click', () => {
         result.classList.add('hidden')
-        cb.onBack()
+        cb.onExit()
       })
     },
     hideResult(): void {

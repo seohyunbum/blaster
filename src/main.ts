@@ -117,6 +117,7 @@ let paintPanel: ReturnType<typeof createPaintPanel> | null = null
 const rangeHud = createRangeHud(hudHost, {
   onBack: () => finishRange(),
   onRetry: () => retryRange(),
+  onExit: () => setStation('workshop'),
   onToggleScope: () => setScope(!scoped),
   onZoomDelta: (d) => changeZoom(d),
 })
@@ -157,6 +158,7 @@ function setStation(id: StationId): void {
   autosave()
 
   const editMode = id === 'workshop' || id === 'paint'
+  app.classList.toggle('range-mode', id === 'range')
   editRoot.visible = editMode
   range.group.visible = id === 'range'
   viewmodel.visible = id === 'range'
