@@ -14,7 +14,11 @@ export const PRESETS: readonly PaintPreset[] = [
   { name: '파스텔', keys: ['pastelSky', 'pastelCream', 'pastelPink'] },
   { name: '네온', keys: ['blasterGreen', 'toyBlack', 'blasterYellow'] },
   { name: '레이싱', keys: ['blasterRed', 'toyGrayLight', 'toyBlack'] },
-  { name: '우주', keys: ['pastelSky', 'toyGrayDark', 'blasterYellow'] },
+  { name: '우주', keys: ['blasterPurple', 'toyGrayDark', 'blasterYellow'] },
+  { name: '바다', keys: ['blasterTeal', 'pastelSky', 'toySilver'] },
+  { name: '사탕', keys: ['blasterMagenta', 'pastelLavender', 'pastelCream'] },
+  { name: '황금', keys: ['toyGold', 'toyCopper', 'toyBlack'] },
+  { name: '정글', keys: ['blasterLime', 'blasterCoral', 'toyGrayDark'] },
 ]
 
 /** 프리셋 키 배열의 존 순서 (primary/secondary/accent). */

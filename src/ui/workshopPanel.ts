@@ -1,7 +1,12 @@
 // src/ui/workshopPanel.ts — 공방 패널: 파츠 선택 + 자유 변형 슬라이더 + 스탯 별 (leaf, main import 금지).
 import type { Blaster, BlasterStats, MorphKey, SlotType } from '../game/types.ts'
 import { partsForSlot } from '../game/parts.ts'
-import { morphParamsFor, resolveMorph, type MorphArchetype } from '../game/morph.ts'
+import {
+  morphParamsFor,
+  resolveMorph,
+  archetypeForSlot,
+  type MorphArchetype,
+} from '../game/morph.ts'
 import { makeStarBar } from './stars.ts'
 import { icoShoot, icoDice } from './icons.ts'
 
@@ -10,6 +15,8 @@ export interface WorkshopCallbacks {
   onMorphInput: (slot: SlotType, key: MorphKey, t: number) => void
   onMorphCommit: (slot: SlotType, key: MorphKey, t: number) => void
   onRandomize: (slot: SlotType) => void
+  /** 완전 랜덤 — 파츠·모양·장식·색 전부 새로 뽑기 */
+  onRandomizeAll: () => void
   onGoRange: () => void
 }
 
@@ -68,6 +75,12 @@ export function createWorkshopPanel(root: HTMLElement, cb: WorkshopCallbacks) {
   overweight.textContent = '무거워서 낑낑대요!'
   statBox.appendChild(overweight)
 
+  const rollAll = document.createElement('button')
+  rollAll.className = 'roll-all-btn'
+  rollAll.innerHTML = `${icoDice()}<span>완전 랜덤 총 만들기</span>`
+  rollAll.addEventListener('click', () => cb.onRandomizeAll())
+  root.appendChild(rollAll)
+
   const goBtn = document.createElement('button')
   goBtn.className = 'go-range-btn'
   goBtn.innerHTML = `${icoShoot()}<span>쏘러 가기</span>`
@@ -107,8 +120,7 @@ export function createWorkshopPanel(root: HTMLElement, cb: WorkshopCallbacks) {
     morphWrap.innerHTML = ''
     if (!blaster) return
     const inst = blaster.parts[activeSlot]
-    const arche: MorphArchetype | null =
-      activeSlot === 'body' ? 'body' : activeSlot === 'barrel' ? 'barrel' : null
+    const arche: MorphArchetype | null = archetypeForSlot(activeSlot)
     if (!inst || !arche) {
       const hint = document.createElement('p')
       hint.className = 'morph-hint'

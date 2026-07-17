@@ -3,8 +3,16 @@
 // 장식(deco) 파라미터는 기본 0(없음). 상세 정본 = docs/design/09_freeform.md
 import type { MorphKey, MorphState, StatDelta } from './types.ts'
 
-export type MorphArchetype = 'body' | 'barrel'
+/** 변형 가능한 파츠 원형 = 슬롯명과 동일 (전 슬롯이 주무를 수 있다). */
+export type MorphArchetype = 'body' | 'barrel' | 'sight' | 'grip' | 'stock' | 'muzzle'
 export type MorphGroup = 'shape' | 'deco'
+
+const ARCHETYPES: readonly string[] = ['body', 'barrel', 'sight', 'grip', 'stock', 'muzzle']
+
+/** 슬롯명 → 원형. 변형 불가 슬롯이면 null. */
+export function archetypeForSlot(slot: string): MorphArchetype | null {
+  return ARCHETYPES.includes(slot) ? (slot as MorphArchetype) : null
+}
 
 export interface MorphParamDef {
   key: MorphKey
@@ -117,6 +125,19 @@ export const MORPH_PARAMS: readonly MorphParamDef[] = [
     deltaAt0: {},
     deltaAt1: {},
   },
+  {
+    key: 'bodyTail',
+    archetype: 'body',
+    group: 'deco',
+    labelKo: '꼬리날개',
+    minLabelKo: '없음',
+    maxLabelKo: '큰 꼬리',
+    min: 0,
+    max: 1,
+    defaultT: 0,
+    deltaAt0: {},
+    deltaAt1: {},
+  },
   // ── 배럴 · 모양 ──
   {
     key: 'barrelLength',
@@ -168,6 +189,140 @@ export const MORPH_PARAMS: readonly MorphParamDef[] = [
     min: 0,
     max: 1,
     defaultT: 0,
+    deltaAt0: {},
+    deltaAt1: {},
+  },
+  {
+    key: 'barrelRib',
+    archetype: 'barrel',
+    group: 'deco',
+    labelKo: '마디 고리',
+    minLabelKo: '없음',
+    maxLabelKo: '많이',
+    min: 0,
+    max: 1,
+    defaultT: 0,
+    deltaAt0: {},
+    deltaAt1: {},
+  },
+  // ── 조준기 · 모양 ──
+  {
+    key: 'sightSize',
+    archetype: 'sight',
+    group: 'shape',
+    labelKo: '크기',
+    minLabelKo: '작게',
+    maxLabelKo: '크게',
+    min: 0.6,
+    max: 1.7,
+    defaultT: 0.5,
+    deltaAt0: { accuracy: -0.5, weight: -0.5 },
+    deltaAt1: { accuracy: 0.5, weight: 0.5 },
+  },
+  {
+    key: 'sightHeight',
+    archetype: 'sight',
+    group: 'shape',
+    labelKo: '높이',
+    minLabelKo: '낮게',
+    maxLabelKo: '높게',
+    min: 0.4,
+    max: 2.2,
+    defaultT: 0.5,
+    deltaAt0: {},
+    deltaAt1: {},
+  },
+  // ── 그립 · 모양 ──
+  {
+    key: 'gripLength',
+    archetype: 'grip',
+    group: 'shape',
+    labelKo: '길이',
+    minLabelKo: '짧게',
+    maxLabelKo: '길게',
+    min: 0.6,
+    max: 1.6,
+    defaultT: 0.5,
+    deltaAt0: { fireRate: 0.5 },
+    deltaAt1: { fireRate: -0.5, accuracy: 0.5 },
+  },
+  {
+    key: 'gripThick',
+    archetype: 'grip',
+    group: 'shape',
+    labelKo: '두께',
+    minLabelKo: '가늘게',
+    maxLabelKo: '두툼하게',
+    min: 0.6,
+    max: 1.8,
+    defaultT: 0.5,
+    deltaAt0: { weight: -0.5 },
+    deltaAt1: { weight: 0.5 },
+  },
+  {
+    key: 'gripAngle',
+    archetype: 'grip',
+    group: 'shape',
+    labelKo: '기울기',
+    minLabelKo: '꼿꼿',
+    maxLabelKo: '비스듬',
+    min: -0.1,
+    max: 0.9,
+    defaultT: 0.5,
+    deltaAt0: {},
+    deltaAt1: {},
+  },
+  // ── 스톡 · 모양 ──
+  {
+    key: 'stockLength',
+    archetype: 'stock',
+    group: 'shape',
+    labelKo: '길이',
+    minLabelKo: '짧게',
+    maxLabelKo: '길게',
+    min: 0.5,
+    max: 1.8,
+    defaultT: 0.5,
+    deltaAt0: { weight: -0.5, accuracy: -0.5 },
+    deltaAt1: { weight: 0.5, accuracy: 0.5 },
+  },
+  {
+    key: 'stockThick',
+    archetype: 'stock',
+    group: 'shape',
+    labelKo: '두께',
+    minLabelKo: '얇게',
+    maxLabelKo: '두껍게',
+    min: 0.6,
+    max: 1.8,
+    defaultT: 0.5,
+    deltaAt0: {},
+    deltaAt1: {},
+  },
+  // ── 총구 · 모양 ──
+  {
+    key: 'muzzleSize',
+    archetype: 'muzzle',
+    group: 'shape',
+    labelKo: '크기',
+    minLabelKo: '작게',
+    maxLabelKo: '크게',
+    min: 0.6,
+    max: 1.9,
+    defaultT: 0.5,
+    deltaAt0: { power: -0.5 },
+    deltaAt1: { power: 0.5 },
+  },
+  {
+    key: 'muzzleLength',
+    archetype: 'muzzle',
+    group: 'shape',
+    labelKo: '길이',
+    minLabelKo: '짧게',
+    maxLabelKo: '길게',
+    min: 0.5,
+    max: 1.8,
+    defaultT: 0.5,
     deltaAt0: {},
     deltaAt1: {},
   },

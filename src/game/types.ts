@@ -71,12 +71,27 @@ export type MorphKey =
   | 'bodyFin'
   | 'bodyCrest'
   | 'bodyAntenna'
+  | 'bodyTail'
   // 배럴 모양
   | 'barrelLength'
   | 'barrelBore'
   | 'barrelTaper'
   // 배럴 장식
   | 'barrelFlare'
+  | 'barrelRib'
+  // 조준기
+  | 'sightSize'
+  | 'sightHeight'
+  // 그립
+  | 'gripLength'
+  | 'gripThick'
+  | 'gripAngle'
+  // 스톡
+  | 'stockLength'
+  | 'stockThick'
+  // 총구
+  | 'muzzleSize'
+  | 'muzzleLength'
 
 /** 저장 단위 — 0..1 정규값. 키 없음 = 0.5(기본형). 희소 Record (09 §6). */
 export type MorphState = Partial<Record<MorphKey, number>>

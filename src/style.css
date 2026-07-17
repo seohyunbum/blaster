@@ -339,6 +339,22 @@ body {
   display: block;
 }
 
+.roll-all-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  border: none;
+  background: linear-gradient(90deg, #9b5de5, #ff4fa3);
+  color: #fff;
+  border-radius: 14px;
+  padding: 13px;
+  font-weight: 900;
+  font-size: 16px;
+  cursor: pointer;
+  box-shadow: var(--shadow);
+}
+
 /* ── 쏘러 가기 ── */
 .go-range-btn {
   display: flex;

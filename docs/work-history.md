@@ -56,3 +56,15 @@
 - **[낮~중] morph 드래그 리빌드 무코얼레싱**: input 마다 전체 지오메트리(12~20 BufferGeometry) 재생성 → `morphDirty` 플래그 + tick 프레임당 1회 소비.
 - **금칙어 가드 커버리지 구멍**: 테스트가 파츠·morph 라벨만 스캔(프리셋·UI 크롬 0개) + `scanString` 이 한글 있으면 EN 토큰 스킵("glock 배럴" 통과). → 병행 스캔으로 수정 + **소스 전수 한글 리터럴 스캔 테스트**(드리프트 방지, vocab.ts 사전 자신은 제외). PRESETS 이중정의 → `game/presets.ts` 단일 정본. glowMaterial 단색 싱글턴 → hex Map 캐시.
 - **기각**: fireRate 미적용(탭=단발 설계 + maxKick 에 실제 기여), randomizeSlot 유령 undo(UI 도달 불가·방어만 적용), 15배 과함(취향), ENVELOPE 미강제(스펙 드리프트지만 correctness 아님 — 후속).
+
+## 2026-07-17 — variation 대폭 확대
+
+병목 진단: morph 가 body·barrel 에만 있었고(조준기·그립·스톡·총구는 고정), 몸통 4종이 전부 같은 RoundedBox 실루엣, 색 12.
+
+- **전 슬롯 morph**: `MorphArchetype` 을 6종(body·barrel·sight·grip·stock·muzzle)으로 확장 + `archetypeForSlot(slot)` 헬퍼(슬롯명=원형명). 신규 키 11 → **총 22 파라미터**(body 8·barrel 5·sight 2·grip 3·stock 2·muzzle 2). workshopPanel·randomizeSlot 의 하드코딩 분기(`slot==='body'?…:null`) 제거.
+- **몸통 실루엣 자체 분화**: `BodyDims.shell = 'box'|'capsule'|'sphere'` + `makeShell()`. 신규 몸통 4종(로켓=캡슐·오브=구·웨지·청크), 젤리=구로 전환.
+- **파츠 증설**: 배럴 5→7(트윈 튜브·니들), 조준기 3→4(경통 스코프), 그립 2→3, 스톡 3→4, 머즐 3→4. 총 16→27.
+- **장식 추가**: bodyTail(꼬리날개 V자 2메시)·barrelRib(마디 고리, ribT 에 비례해 1~5개).
+- **색·프리셋**: 팔레트 12→22키(보라·청록·마젠타·라임·코랄·라벤더·피치·실버·골드·코퍼), primary 밝은색 20종. 프리셋 4→8.
+- **완전 랜덤 버튼**: 파츠 선택·morph·장식·색·finish 를 한 번에 재추첨. 장식은 50% 확률로만 켜고 부착 슬롯은 22% 확률로 비워 "없는 것도 변형"으로. 검증: 5회 연속 전부 다른 결과.
+- **테스트 드리프트 방지**: visuals 테스트를 하드코딩 목록 → **카탈로그·MORPH_PARAMS 파생**으로 전환(파츠·키 추가 시 자동 커버). 메시 예산 10→14(몸통 최대 12=기본5+장식7, 배럴 최대 8).

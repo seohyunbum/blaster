@@ -4,8 +4,9 @@ import * as THREE from 'three'
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js'
 
 import type { Blaster, MorphKey, MorphState, PartPaint, SlotType } from './game/types.ts'
-import { computeStats } from './game/parts.ts'
-import { boreScaleFromMorph } from './game/morph.ts'
+import { computeStats, partsForSlot } from './game/parts.ts'
+import { boreScaleFromMorph, archetypeForSlot } from './game/morph.ts'
+import { ALL_PALETTE_KEYS, isBright } from './game/palette.ts'
 import {
   toShotProfile,
   PROJECTILE_GRAVITY,
@@ -147,6 +148,7 @@ const workshopPanel = createWorkshopPanel(wsRoot, {
   onMorphInput: (slot, k, t) => morphInput(slot, k, t),
   onMorphCommit: (slot, k, t) => morphCommit(slot, k, t),
   onRandomize: (slot) => randomizeSlot(slot),
+  onRandomizeAll: () => randomizeAll(),
   onGoRange: () => setStation('range'),
 })
 
@@ -390,18 +392,60 @@ function morphCommit(slot: SlotType, key: MorphKey, t: number): void {
   autosave()
 }
 
+function randomMorphFor(arche: string): MorphState {
+  const m: MorphState = {}
+  for (const p of MORPH_PARAMS) {
+    if (p.archetype !== arche) continue
+    // 장식은 절반 확률로만 켠다 — 늘 만땅이면 다양성이 오히려 죽는다
+    if (p.group === 'deco' && Math.random() < 0.5) continue
+    m[p.key] = 0.1 + Math.random() * 0.8
+  }
+  return m
+}
+
 function randomizeSlot(slot: SlotType): void {
   const inst = active.parts[slot]
   if (!inst) return
-  const arche = slot === 'body' ? 'body' : slot === 'barrel' ? 'barrel' : null
+  const arche = archetypeForSlot(slot)
   if (!arche) return // 가드를 pushUndo 앞으로 — 빈 undo 엔트리 방지
   morphGesture = null
   pushUndo()
-  const m: MorphState = {}
-  for (const p of MORPH_PARAMS) {
-    if (p.archetype === arche) m[p.key] = 0.1 + Math.random() * 0.8
+  inst.morph = randomMorphFor(arche)
+  sfx.snap()
+  rebuildEdit('full')
+  refreshPanels()
+  autosave()
+}
+
+function pick<T>(arr: readonly T[]): T {
+  return arr[Math.floor(Math.random() * arr.length)]!
+}
+
+/** 완전 랜덤 — 파츠·모양·장식·색까지 전부 새로 뽑는다. */
+function randomizeAll(): void {
+  morphGesture = null
+  pushUndo()
+  const brightKeys = ALL_PALETTE_KEYS.filter(isBright)
+  const randomPaint = (): PartPaint => ({
+    primary: { color: pick(brightKeys), finish: pick(FINISHES) },
+    secondary: { color: pick(ALL_PALETTE_KEYS), finish: pick(FINISHES) },
+    accent: { color: pick(ALL_PALETTE_KEYS), finish: pick(FINISHES) },
+  })
+  const next: Blaster['parts'] = {}
+  // 몸통은 필수, 나머지는 확률적으로 (없는 것도 하나의 변형)
+  const bodyId = pick(partsForSlot('body')).id
+  next.body = { partId: bodyId, paint: randomPaint(), morph: randomMorphFor('body') }
+  for (const slot of ['barrel', 'sight', 'grip', 'stock', 'muzzle'] as SlotType[]) {
+    const opts = partsForSlot(slot)
+    if (opts.length === 0) continue
+    if (Math.random() < 0.22) continue // 가끔은 비워 둔다
+    next[slot] = {
+      partId: pick(opts).id,
+      paint: randomPaint(),
+      morph: randomMorphFor(archetypeForSlot(slot) ?? 'body'),
+    }
   }
-  inst.morph = m
+  active.parts = next
   sfx.snap()
   rebuildEdit('full')
   refreshPanels()
@@ -513,6 +557,7 @@ let recoilRecovery = (8 * Math.PI) / 180 // rad/s — enterRange 에서 총별�
 const RECOIL_MAX_RAD = (RECOIL_MAX_DEG * Math.PI) / 180
 const _gDir = new THREE.Vector3()
 const _gOrigin = new THREE.Vector3()
+const FINISHES: readonly ('matte' | 'gloss' | 'metal')[] = ['matte', 'gloss', 'metal']
 const COURSE_ID = 'balloon_yard'
 // 00_DECISIONS: ★1=완주(1발+), ★2=명중 6+, ★3=명중 9 (아이 친화 — 결과는 항상 플러스)
 const STAR_CUTS: [number, number, number] = [1, 6, 9]

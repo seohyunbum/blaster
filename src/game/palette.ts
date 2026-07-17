@@ -8,11 +8,22 @@ export const TOY_PALETTE = {
   blasterYellow: 0xffd23f,
   blasterRed: 0xf05454, // 채도 높지만 '피 빨강' 아님
   blasterGreen: 0x4cd964, // 라임 그린 — 군녹색 아님
+  blasterPurple: 0x9b5de5,
+  blasterTeal: 0x00c2b2,
+  blasterMagenta: 0xff4fa3,
+  blasterLime: 0xb9f227,
+  blasterCoral: 0xff7a5c,
   // 파스텔 (꾸미기·배경·타겟)
   pastelPink: 0xffb5c9,
   pastelMint: 0xa8e6cf,
   pastelSky: 0xbde0fe,
   pastelCream: 0xfff3d6,
+  pastelLavender: 0xd8c6ff,
+  pastelPeach: 0xffd3b6,
+  // 반짝이 계열 (metal finish 와 잘 어울림)
+  toySilver: 0xc9d2dd,
+  toyGold: 0xf2c14e,
+  toyCopper: 0xd98757,
   // 중립·다크 (secondary/accent 전용 — primary 존 사용 금지)
   toyGrayLight: 0xd9dde3,
   toyGrayDark: 0x6b7280,

@@ -2,20 +2,13 @@ import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { buildPart, countMeshes } from '../src/game/partVisuals.ts'
 import type { MorphKey, MorphState } from '../src/game/types.ts'
+import { BODIES, PARTS } from '../src/game/parts.ts'
+import { MORPH_PARAMS } from '../src/game/morph.ts'
 
-const M1_PARTS = [
-  'body_popcorn', 'body_bulldog', 'body_titan', 'body_jelly',
-  'barrel_snap', 'barrel_rail', 'barrel_stub', 'barrel_spiral', 'barrel_wide',
-  'sight_dot', 'sight_pin', 'sight_ring',
-  'grip_mini', 'grip_banana',
-  'stock_pad', 'stock_spring', 'stock_balloon',
-  'muzzle_horn', 'muzzle_booster', 'muzzle_star',
-]
+// 카탈로그에서 직접 뽑는다 — 파츠를 추가해도 자동 커버(드리프트 방지)
+const M1_PARTS: string[] = [...BODIES, ...PARTS].map((p) => p.id)
 // 모든 morph 키(모양+장식)를 0/1 로 몰아 극단 검사 — 장식 전부 켜면 메시 최대
-const ALL_KEYS: MorphKey[] = [
-  'bodyLength', 'bodyChub', 'bodyNose', 'bodyRound', 'bodyFin', 'bodyCrest', 'bodyAntenna',
-  'barrelLength', 'barrelBore', 'barrelTaper', 'barrelFlare',
-]
+const ALL_KEYS: MorphKey[] = MORPH_PARAMS.map((p) => p.key)
 function fill(v: number): MorphState {
   const m: MorphState = {}
   for (const k of ALL_KEYS) m[k] = v
@@ -23,7 +16,9 @@ function fill(v: number): MorphState {
 }
 const EXTREMES: MorphState[] = [{}, fill(0), fill(1), fill(0.5)]
 
-const MESH_BUDGET = 10 // 몸통 장식 전부 켜면 5기본+5장식
+// 몸통 최대: 기본 5(셸·핸들·가드·코·캡) + 장식 7(날개2·볏1·꼬리2·안테나2) = 12
+// 배럴 최대: 튜브·머즐링 + 나팔 + 마디고리 5 = 8
+const MESH_BUDGET = 14
 
 test('메시 수 ≤ 10 — 극단 morph(장식 포함) (verify 게이트 §8-1)', () => {
   for (const id of M1_PARTS) {

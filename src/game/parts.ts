@@ -52,6 +52,46 @@ export const BODIES: readonly BodyDef[] = [
     weightLimit: 8,
     sockets: ['barrel', 'sight', 'grip', 'stock', 'muzzle'],
   },
+  {
+    id: 'body_rocket',
+    slot: 'body',
+    nameKo: '로켓 코어',
+    desc: '길쭉한 알약 모양. 쭉쭉 뻗는 느낌',
+    delta: {},
+    base: { power: 5, fireRate: 5, accuracy: 6, weight: 4 },
+    weightLimit: 9,
+    sockets: ['barrel', 'sight', 'grip', 'stock', 'muzzle'],
+  },
+  {
+    id: 'body_orb',
+    slot: 'body',
+    nameKo: '오브 코어',
+    desc: '동그란 공 모양. 귀엽고 통통 튀어요',
+    delta: {},
+    base: { power: 4, fireRate: 7, accuracy: 3, weight: 3 },
+    weightLimit: 7,
+    sockets: ['barrel', 'sight', 'grip', 'stock', 'muzzle'],
+  },
+  {
+    id: 'body_wedge',
+    slot: 'body',
+    nameKo: '웨지 코어',
+    desc: '납작하고 날렵한 프레임. 재빠르게',
+    delta: {},
+    base: { power: 4, fireRate: 7, accuracy: 5, weight: 3 },
+    weightLimit: 7,
+    sockets: ['barrel', 'sight', 'grip', 'stock', 'muzzle'],
+  },
+  {
+    id: 'body_chunk',
+    slot: 'body',
+    nameKo: '청크 코어',
+    desc: '떡 벌어진 넓적 프레임. 든든해요',
+    delta: {},
+    base: { power: 6, fireRate: 3, accuracy: 5, weight: 5 },
+    weightLimit: 11,
+    sockets: ['barrel', 'sight', 'grip', 'stock', 'muzzle'],
+  },
 ]
 
 // ─── 부착 파츠 (배럴·조준기·그립·스톡·머즐) ──────────────────
@@ -92,7 +132,21 @@ export const PARTS: readonly PartDef[] = [
     desc: '입구가 넓은 배럴. 큼직한 발사체가 나가요',
     delta: { power: 2, fireRate: -1, weight: 1 },
   },
-  // 조준기 3종
+  {
+    id: 'barrel_twin',
+    slot: 'barrel',
+    nameKo: '트윈 튜브',
+    desc: '나란한 두 줄 배럴. 폼이 살아요',
+    delta: { power: 1, fireRate: 1, accuracy: -1, weight: 2 },
+  },
+  {
+    id: 'barrel_needle',
+    slot: 'barrel',
+    nameKo: '니들 배럴',
+    desc: '아주 가늘고 긴 배럴. 콕 집어 맞혀요',
+    delta: { fireRate: -1, accuracy: 4, weight: 1 },
+  },
+  // 조준기 4종
   {
     id: 'sight_dot',
     slot: 'sight',
@@ -114,7 +168,14 @@ export const PARTS: readonly PartDef[] = [
     desc: '동그란 고리로 겨누는 사이트',
     delta: { accuracy: 2 },
   },
-  // 그립 2종
+  {
+    id: 'sight_scope',
+    slot: 'sight',
+    nameKo: '경통 스코프',
+    desc: '길쭉한 경통. 멀리 있는 과녁도 또렷해요',
+    delta: { accuracy: 3, fireRate: -1, weight: 1 },
+  },
+  // 그립 3종
   {
     id: 'grip_mini',
     slot: 'grip',
@@ -129,7 +190,14 @@ export const PARTS: readonly PartDef[] = [
     desc: '바나나 모양. 웃긴데 성능도 좋아요',
     delta: { fireRate: 1, accuracy: 1, weight: 1 },
   },
-  // 스톡 3종
+  {
+    id: 'grip_chunky',
+    slot: 'grip',
+    nameKo: '통통 그립',
+    desc: '두툼해서 꽉 잡히는 손잡이',
+    delta: { accuracy: 1, weight: 1 },
+  },
+  // 스톡 4종
   {
     id: 'stock_pad',
     slot: 'stock',
@@ -151,7 +219,14 @@ export const PARTS: readonly PartDef[] = [
     desc: '풍선이라 가벼워요! 대신 흔들흔들',
     delta: { weight: -1, accuracy: -1 },
   },
-  // 머즐 3종 (배럴 끝에 붙음)
+  {
+    id: 'stock_skeleton',
+    slot: 'stock',
+    nameKo: '뼈대 스톡',
+    desc: '구멍 숭숭 뼈대 모양. 가볍고 멋져요',
+    delta: { accuracy: 1 },
+  },
+  // 머즐 4종 (배럴 끝에 붙음)
   {
     id: 'muzzle_horn',
     slot: 'muzzle',
@@ -172,6 +247,13 @@ export const PARTS: readonly PartDef[] = [
     nameKo: '반짝이 팁',
     desc: '반짝반짝 별 모양 팁',
     delta: {},
+  },
+  {
+    id: 'muzzle_ring',
+    slot: 'muzzle',
+    nameKo: '도넛 링',
+    desc: '도넛처럼 동그란 총구 링',
+    delta: { accuracy: 1 },
   },
 ]
 
