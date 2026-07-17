@@ -1,15 +1,18 @@
 // src/ui/rangeHud.ts — 사격장 HUD: 조준점·명중 수·결과 별 (leaf).
 import { resultStars } from './stars.ts'
 
+/** 조준 선택: null=일반(맨눈) · 'reddot'=레드도트(저배율+빨간점) · 4~15=망원 스코프 배율. */
+export type AimSel = number | 'reddot' | null
+export type AimMode = 'none' | 'reddot' | 'scope'
+
 export interface RangeHudCallbacks {
   onBack: () => void // 상단 "공방으로" — 라운드 종료(결과 표시)
   onRetry: () => void // 결과 카드 "한 번 더"
   onExit: () => void // 결과 카드 "공방으로" — 공방으로 실제 이동
-  /** 배율 선택 — null = 조준경 끄기(일반), 4~15 = 그 배율로 조준경 켜기. */
-  onSelectMag: (mag: number | null) => void
+  onSelectMag: (sel: AimSel) => void
 }
 
-/** 조준경 배율 선택지 (4~15배). */
+/** 망원 스코프 배율 선택지 (4~15배). */
 export const MAG_OPTIONS: readonly number[] = [4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15]
 
 export function createRangeHud(root: HTMLElement, cb: RangeHudCallbacks) {
@@ -36,15 +39,21 @@ export function createRangeHud(root: HTMLElement, cb: RangeHudCallbacks) {
 
   const hint = document.createElement('div')
   hint.className = 'range-hint'
-  hint.textContent = '끌어서 조준 · 눌러서 발사 · 아래에서 배율(4~15배)을 골라 조준'
+  hint.textContent = '끌어서 조준 · 눌러서 발사 · 아래에서 레드도트나 배율을 골라 조준'
   root.appendChild(hint)
 
-  // 스코프 오버레이 (조준경 ON 일 때 원형 비네트)
+  // 망원 스코프 오버레이 (4~15배 — 검은 원형 비네트)
   const scope = document.createElement('div')
   scope.className = 'scope-overlay hidden'
   scope.innerHTML =
     '<div class="scope-ring"></div><div class="scope-cross-v"></div><div class="scope-cross-h"></div>'
   root.appendChild(scope)
+
+  // 레드도트 오버레이 (저배율 — 비네트 없이 빨간 점 조준경)
+  const reddot = document.createElement('div')
+  reddot.className = 'reddot-overlay hidden'
+  reddot.innerHTML = '<div class="rd-ring"></div><div class="rd-dot"></div>'
+  root.appendChild(reddot)
 
   // 배율 선택 시스템 — 일반(끄기) + 4~15배 중 하나 선택
   const zoomCtl = document.createElement('div')
@@ -58,16 +67,17 @@ export function createRangeHud(root: HTMLElement, cb: RangeHudCallbacks) {
   zoomCtl.appendChild(magList)
   root.appendChild(zoomCtl)
 
-  const magChips: { mag: number | null; el: HTMLButtonElement }[] = []
-  const addChip = (mag: number | null, label: string): void => {
+  const magChips: { sel: AimSel; el: HTMLButtonElement }[] = []
+  const addChip = (sel: AimSel, label: string, cls = ''): void => {
     const b = document.createElement('button')
-    b.className = 'mag-chip'
+    b.className = 'mag-chip' + (cls ? ' ' + cls : '')
     b.textContent = label
-    b.addEventListener('click', () => cb.onSelectMag(mag))
+    b.addEventListener('click', () => cb.onSelectMag(sel))
     magList.appendChild(b)
-    magChips.push({ mag, el: b })
+    magChips.push({ sel, el: b })
   }
   addChip(null, '일반')
+  addChip('reddot', '레드도트', 'reddot-chip')
   for (const m of MAG_OPTIONS) addChip(m, `${m}배`)
 
   const result = document.createElement('div')
@@ -91,12 +101,13 @@ export function createRangeHud(root: HTMLElement, cb: RangeHudCallbacks) {
       const size = 18 + spreadDeg * 14
       cross.style.setProperty('--ring-size', `${size}px`)
     },
-    /** 배율 선택 상태 반영 — 스코프 비네트·조준점·선택 칩 하이라이트. */
-    setMagSelection(scopedOn: boolean, zoom: number): void {
-      scope.classList.toggle('hidden', !scopedOn)
-      cross.style.display = scopedOn ? 'none' : ''
-      const active: number | null = scopedOn ? zoom : null
-      for (const c of magChips) c.el.classList.toggle('active', c.mag === active)
+    /** 조준 모드 반영 — 스코프/레드도트 오버레이·조준점·선택 칩 하이라이트. */
+    setMagSelection(mode: AimMode, zoom: number): void {
+      scope.classList.toggle('hidden', mode !== 'scope')
+      reddot.classList.toggle('hidden', mode !== 'reddot')
+      cross.style.display = mode === 'none' ? '' : 'none'
+      const active: AimSel = mode === 'none' ? null : mode === 'reddot' ? 'reddot' : zoom
+      for (const c of magChips) c.el.classList.toggle('active', c.sel === active)
     },
     showResult(stars: 0 | 1 | 2 | 3, hitCount: number): void {
       result.innerHTML =

@@ -540,6 +540,46 @@ body {
   width: min(60vh, 60vw);
   height: 2px;
 }
+/* ── 레드도트 조준경 (저배율 — 비네트 없음, 빨간 점만) ── */
+.reddot-overlay {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+.reddot-overlay.hidden {
+  display: none;
+}
+.rd-ring {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: min(46vh, 46vw);
+  height: min(46vh, 46vw);
+  transform: translate(-50%, -50%);
+  border: 6px solid rgba(30, 40, 55, 0.28);
+  border-radius: 50%;
+  box-shadow:
+    inset 0 0 0 2px rgba(255, 255, 255, 0.3),
+    0 0 0 2px rgba(255, 255, 255, 0.2);
+}
+.rd-dot {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 12px;
+  height: 12px;
+  transform: translate(-50%, -50%);
+  background: #ff2b2b;
+  border-radius: 50%;
+  box-shadow:
+    0 0 10px 3px rgba(255, 43, 43, 0.8),
+    0 0 2px 1px rgba(255, 255, 255, 0.6);
+}
+.reddot-chip.active {
+  background: #f0454e;
+  border-color: #f0454e;
+}
+
 .zoom-control {
   position: absolute;
   left: 50%;

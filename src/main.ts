@@ -22,7 +22,8 @@ import { MORPH_PARAMS } from './game/morph.ts'
 import { createStationBar, type StationId } from './ui/stationBar.ts'
 import { createWorkshopPanel } from './ui/workshopPanel.ts'
 import { createPaintPanel } from './ui/paintPanel.ts'
-import { createRangeHud } from './ui/rangeHud.ts'
+import { createRangeHud, MAG_OPTIONS } from './ui/rangeHud.ts'
+import type { AimMode, AimSel } from './ui/rangeHud.ts'
 
 // ─── DOM ────────────────────────────────────────────────────
 const app = document.getElementById('app')!
@@ -168,7 +169,7 @@ function setStation(id: StationId): void {
   hudHost.style.display = id === 'range' ? '' : 'none'
 
   if (editMode) {
-    scoped = false
+    aimMode = 'none'
     camera.fov = BASE_FOV
     camera.updateProjectionMatrix()
     camera.position.set(0.55, 0.34, 0.9)
@@ -367,11 +368,12 @@ const COURSE_ID = 'balloon_yard'
 // 00_DECISIONS: ★1=완주(1발+), ★2=명중 6+, ★3=명중 9 (아이 친화 — 결과는 항상 플러스)
 const STAR_CUTS: [number, number, number] = [1, 6, 9]
 
-// ─── 조준경 배율 (4~15배) ───────────────────────────────────
+// ─── 조준 모드: 일반 · 레드도트(저배율) · 망원 스코프(4~15배) ──
 const BASE_FOV = 45
 const ZOOM_MIN = 4
 const ZOOM_MAX = 15
-let scoped = false
+const REDDOT_MAG = 1.5 // 레드도트 저배율 — "배율은 높지 않지만" 빨간 점 조준
+let aimMode: AimMode = 'none'
 let zoom = ZOOM_MIN
 
 /** 배율 z 에 대한 광학적 FOV(도). z=1 이면 BASE_FOV. */
@@ -380,33 +382,38 @@ function fovForZoom(z: number): number {
   return (2 * Math.atan(Math.tan(half) / z) * 180) / Math.PI
 }
 
+function currentMag(): number {
+  return aimMode === 'scope' ? zoom : aimMode === 'reddot' ? REDDOT_MAG : 1
+}
+
 function applyView(): void {
-  camera.fov = scoped ? fovForZoom(zoom) : BASE_FOV
+  camera.fov = fovForZoom(currentMag())
   camera.updateProjectionMatrix()
 }
 
-/** 배율 선택 — null=일반(끄기), 4~15=그 배율로 조준경 켜기 (조준경 시스템). */
-function selectMag(mag: number | null): void {
-  if (mag === null) {
-    scoped = false
+/** 조준 선택 — null=일반 · 'reddot'=레드도트 · 4~15=망원 스코프. */
+function selectMag(sel: AimSel): void {
+  if (sel === null) {
+    aimMode = 'none'
+  } else if (sel === 'reddot') {
+    aimMode = 'reddot'
   } else {
-    scoped = true
-    zoom = Math.max(ZOOM_MIN, Math.min(ZOOM_MAX, Math.round(mag)))
+    aimMode = 'scope'
+    zoom = Math.max(ZOOM_MIN, Math.min(ZOOM_MAX, Math.round(sel)))
   }
   applyView()
-  rangeHud.setMagSelection(scoped, zoom)
+  rangeHud.setMagSelection(aimMode, zoom)
   sfx.click()
 }
 
-/** 휠 편의 — 배율 선택지를 한 칸씩 이동(맨 아래에서 더 내리면 일반). */
+// 휠 편의 — 선택지(일반→레드도트→4…15배)를 한 칸씩 이동
+const AIM_ORDER: AimSel[] = [null, 'reddot', ...MAG_OPTIONS]
 function stepMag(delta: number): void {
-  if (!scoped) {
-    if (delta > 0) selectMag(ZOOM_MIN)
-    return
-  }
-  const next = zoom + delta
-  if (next < ZOOM_MIN) selectMag(null)
-  else selectMag(Math.min(ZOOM_MAX, next))
+  const cur: AimSel = aimMode === 'none' ? null : aimMode === 'reddot' ? 'reddot' : zoom
+  let i = AIM_ORDER.findIndex((s) => s === cur)
+  if (i < 0) i = 0
+  i = Math.max(0, Math.min(AIM_ORDER.length - 1, i + delta))
+  selectMag(AIM_ORDER[i] ?? null)
 }
 
 range.onHit = (e) => {
@@ -429,10 +436,10 @@ function enterRange(): void {
   aimYaw = 0
   aimPitch = 0
   recoilPitch = 0
-  scoped = false
+  aimMode = 'none'
   zoom = ZOOM_MIN
   applyView()
-  rangeHud.setMagSelection(false, zoom)
+  rangeHud.setMagSelection('none', zoom)
   camera.position.set(0, 1.5, 0.2)
   composeAim()
   rebuildViewmodel()
@@ -514,8 +521,8 @@ renderer.domElement.addEventListener('pointermove', (ev) => {
   const dx = ev.clientX - downX
   const dy = ev.clientY - downY
   moved = Math.max(moved, Math.hypot(dx, dy))
-  // 조준경 배율만큼 감도를 낮춰 정밀 조준 (fov 비례)
-  const sens = 0.0032 * (scoped ? fovForZoom(zoom) / BASE_FOV : 1)
+  // 조준 배율만큼 감도를 낮춰 정밀 조준 (fov 비례 — 일반 1.0, 레드도트 약간, 스코프 크게)
+  const sens = 0.0032 * (fovForZoom(currentMag()) / BASE_FOV)
   aimYaw -= (ev.movementX || 0) * sens
   aimPitch -= (ev.movementY || 0) * sens
   aimPitch = Math.max(-0.5, Math.min(0.45, aimPitch))
@@ -526,7 +533,7 @@ window.addEventListener('pointerup', () => {
   pointerDown = false
   if (moved < 8) fire()
 })
-// 휠 = 배율 한 칸씩 이동, 우클릭 = 조준경 켜기/끄기 토글
+// 휠 = 조준 선택지 한 칸씩 이동, 우클릭 = 레드도트 빠른 조준 켜기/끄기
 renderer.domElement.addEventListener(
   'wheel',
   (ev) => {
@@ -539,7 +546,7 @@ renderer.domElement.addEventListener(
 renderer.domElement.addEventListener('contextmenu', (ev) => {
   if (station !== 'range') return
   ev.preventDefault()
-  selectMag(scoped ? null : zoom)
+  selectMag(aimMode === 'none' ? 'reddot' : null)
 })
 
 // ─── 루프 ──────────────────────────────────────────────────
@@ -613,8 +620,8 @@ tick()
     composeAim()
   },
   hits: () => balloonHits,
-  selectMag: (mag: number | null) => selectMag(mag),
-  zoomState: () => ({ scoped, zoom, fov: Math.round(camera.fov * 100) / 100 }),
+  selectMag: (sel: AimSel) => selectMag(sel),
+  zoomState: () => ({ aimMode, zoom, fov: Math.round(camera.fov * 100) / 100 }),
   /** QA용 수동 스텝 — 백그라운드 탭 rAF 스로틀 우회. dt 고정 60fps. */
   step: (n = 1) => {
     for (let i = 0; i < n; i++) {
