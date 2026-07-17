@@ -54,9 +54,10 @@ test('bodyLength morph 이 barrel 소켓 앵커를 전진시킨다', () => {
   long.dispose()
 })
 
-test('미등록 파츠 = 회색 폴백 (돌덩이 규칙)', () => {
-  const built = buildPart('body_ghost' as string, { morph: {} })
-  assert.ok(countMeshes(built.group) >= 1)
+test('미등록(prefix 불일치) 파츠 = 회색 폴백 1메시 (돌덩이 규칙)', () => {
+  // prefix 매칭이 안 되는 id 라야 buildFallback 에 도달한다
+  const built = buildPart('zzz_ghost' as string, { morph: {} })
+  assert.equal(countMeshes(built.group), 1)
   const dummy: MorphKey[] = []
   assert.equal(dummy.length, 0)
   built.dispose()

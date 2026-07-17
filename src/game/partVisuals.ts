@@ -354,9 +354,9 @@ function buildMuzzle(partId: PartId, opts: BuildOpts): BuiltPart {
     accent.push(star)
     group.add(star)
   } else {
-    // 나팔 팁 — 트럼펫 모양 flare
+    // 나팔 팁 — 트럼펫 모양 flare (넓은 벨 입구가 전방 -Z, 립 링과 정렬)
     const hornGeo = new THREE.CylinderGeometry(0.06, 0.035, 0.08, seg, 1, true)
-    hornGeo.rotateX(Math.PI / 2)
+    hornGeo.rotateX(-Math.PI / 2)
     geos.push(hornGeo)
     const horn = new THREE.Mesh(hornGeo, fixedMaterial(PLACEHOLDER))
     horn.position.set(0, 0, -0.04)

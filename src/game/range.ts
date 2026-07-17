@@ -107,6 +107,8 @@ export class RangeController {
       3,
     )
     this.confetti.count = CONFETTI_MAX
+    // 이동하는 InstancedMesh — 원-샷 boundingSphere 컬링 방지(명중 콘페티가 안 보이던 버그)
+    this.confetti.frustumCulled = false
     for (let i = 0; i < CONFETTI_MAX; i++) {
       this.confVel.push(new THREE.Vector3())
       this.confLife.push(0)
@@ -127,6 +129,7 @@ export class RangeController {
     })
     this.guide = new THREE.InstancedMesh(guideGeo, guideMat, GUIDE_DOTS)
     this.guide.count = GUIDE_DOTS
+    this.guide.frustumCulled = false // 동일 컬링 방지(방어)
     for (let i = 0; i < GUIDE_DOTS; i++) {
       _dummy.position.set(0, -999, 0)
       _dummy.updateMatrix()
