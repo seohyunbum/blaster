@@ -251,6 +251,7 @@ function openBlaster(id: string, goto?: StationId): void {
   active = b
   save.activeBlasterId = id
   undoStack.length = 0
+  morphGesture = null // 블래스터 전환 — 이전 gesture 스냅샷 폐기
   sfx.click()
   autosave()
   if (goto) {
@@ -269,6 +270,7 @@ function duplicateBlaster(id: string): void {
   active = copy
   save.activeBlasterId = copy.id
   undoStack.length = 0
+  morphGesture = null
   sfx.snap()
   rebuildEdit('full')
   refreshPanels()
@@ -280,7 +282,9 @@ function renameBlaster(id: string, name: string): void {
   if (!b) return
   b.name = name
   if (b.id === active.id) stationBar.setName(name)
-  refreshPanels()
+  // refreshPanels() 호출 안 함 — rename 은 이름 커밋(blur) 중 발생하므로 목록을 통째로
+  // 재생성하면 뒤이은 click 대상 노드가 사라져 첫 클릭이 삼켜진다(QA 확정). 이름은 이미
+  // input 에 반영돼 있고 카드 스탯·스와치는 이름과 무관하다.
   autosave()
 }
 
@@ -294,6 +298,7 @@ function deleteBlaster(id: string): void {
     active = save.blasters[0]!
     save.activeBlasterId = active.id
     undoStack.length = 0
+    morphGesture = null
     rebuildEdit('full')
   }
   sfx.click()
