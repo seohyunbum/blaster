@@ -72,7 +72,7 @@ scene.add(range.group)
 // 사격장 뷰모델 (카메라에 부착 — 내가 만든 총 상시 노출, 04 §8)
 const viewmodel = new THREE.Group()
 viewmodel.position.set(0.14, -0.16, -0.42)
-viewmodel.rotation.y = Math.PI // 총구(-Z)를 카메라 전방으로
+// 블래스터 로컬 -Z(총구) = 카메라 전방(-Z) 이므로 회전 불필요 (y=π 면 총구가 뷰어를 향함)
 camera.add(viewmodel)
 scene.add(camera)
 
@@ -193,11 +193,14 @@ function setStation(id: StationId): void {
 
 // ─── 파츠 선택 ─────────────────────────────────────────────
 function selectPart(slot: SlotType, partId: string | null): void {
+  const prev = active.parts[slot]
+  // 변화 없으면 무시 — 같은 파츠 재선택으로 morph 를 지우거나 빈 undo 를 쌓지 않는다
+  if (partId === null && !prev) return
+  if (partId !== null && prev?.partId === partId) return
   pushUndo()
   if (partId === null) {
     if (slot !== 'body') delete active.parts[slot]
   } else {
-    const prev = active.parts[slot]
     const inst = makeInstance(partId)
     if (prev) inst.paint = prev.paint // 페인트 보존
     active.parts[slot] = inst
@@ -361,7 +364,8 @@ let aimPitch = 0
 let recoilPitch = 0
 let balloonHits = 0
 const COURSE_ID = 'balloon_yard'
-const STAR_CUTS: [number, number, number] = [6, 12, 20]
+// 00_DECISIONS: ★1=완주(1발+), ★2=명중 6+, ★3=명중 9 (아이 친화 — 결과는 항상 플러스)
+const STAR_CUTS: [number, number, number] = [1, 6, 9]
 
 // ─── 조준경 배율 (4~15배) ───────────────────────────────────
 const BASE_FOV = 45

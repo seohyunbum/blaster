@@ -282,7 +282,8 @@ export class RangeController {
           _c.x = bd.center.x
           _c.y = bd.center.y
           _c.z = bd.center.z
-          if (sweepHitSphere(_prev, _cur, _c, bd.hitRadius + p.radius)) {
+          // 어시스트 계수는 풍선·과녁 모두 동일 적용 (04 §8 ①)
+          if (sweepHitSphere(_prev, _cur, _c, bd.hitRadius * ASSIST_RADIUS_MUL + p.radius)) {
             const dist = Math.hypot(p.pos.x - bd.center.x, p.pos.y - bd.center.y)
             const pts = dist < 0.15 ? 200 : dist < 0.35 ? 100 : 50
             this.onHit?.({ kind: 'board', points: pts, x: p.pos.x, y: p.pos.y, z: bd.center.z })
