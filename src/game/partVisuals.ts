@@ -125,23 +125,31 @@ function buildBody(partId: PartId, opts: BuildOpts): BuiltPart {
   accent.push(guard)
   group.add(guard)
 
-  // 코 (앞) — primary. 단일 패밀리: Cone + Sphere 캡을 동시에 lerp (09 §2.1)
+  // 코 (앞) — primary. box 는 앞면 평평→z=-halfZ 부착. 구·캡슐은 앞끝이 점(반경0)이라
+  // 그대로 두면 코 원판이 뜬 목걸이(collar)가 됨 → 곡면 안쪽에 base 를 파묻어 병합.
   const noseLen = 0.01 + 0.1 * noseT
-  const noseBaseR = Math.max(0.02, h * 0.42)
-  const tipR = Math.max(0.02, noseBaseR * (1 - 0.7 * noseT))
+  let noseBaseR = Math.max(0.02, h * 0.42)
+  let noseBaseZ = -halfZ + 0.002
+  if (dims.shell !== 'box') {
+    const frac = 0.62
+    noseBaseZ = -halfZ * frac
+    const shellR = (h / 2) * Math.sqrt(Math.max(0, 1 - frac * frac))
+    noseBaseR = Math.min(noseBaseR, shellR * 0.98)
+  }
+  const tipR = Math.max(0.018, noseBaseR * (1 - 0.7 * noseT))
   const coneSeg = segFor(opts.lod, 14, 8)
   const noseGeo = new THREE.ConeGeometry(noseBaseR, noseLen, coneSeg)
   geos.push(noseGeo)
   const nose = new THREE.Mesh(noseGeo, fixedMaterial(PLACEHOLDER))
   nose.rotation.x = -Math.PI * 0.5 // 첨단이 -Z(전방)
-  nose.position.set(0, 0, -halfZ - noseLen * 0.5)
+  nose.position.set(0, 0, noseBaseZ - noseLen * 0.5)
   primary.push(nose)
   group.add(nose)
 
   const capGeo = new THREE.SphereGeometry(tipR, coneSeg, Math.max(6, coneSeg / 2))
   geos.push(capGeo)
   const cap = new THREE.Mesh(capGeo, fixedMaterial(PLACEHOLDER))
-  cap.position.set(0, 0, -halfZ - noseLen)
+  cap.position.set(0, 0, noseBaseZ - noseLen)
   primary.push(cap)
   group.add(cap)
 
@@ -284,11 +292,13 @@ function buildBarrel(partId: PartId, opts: BuildOpts): BuiltPart {
   const ribT = morphLerp('barrelRib', resolveMorph(opts.morph, 'barrelRib'))
   if (ribT > 0.02) {
     const count = Math.max(1, Math.round(1 + 4 * ribT))
-    const ribGeo = new THREE.TorusGeometry(r * 1.12, r * 0.16, 6, radial)
-    geos.push(ribGeo)
     for (let i = 0; i < count; i++) {
+      const f = (i + 1) / (count + 1) // 뒤끝(0)→앞끝(1) 비율
+      const localR = r + (rFront - r) * f // 그 지점 배럴 실반경 (테이퍼 추종)
+      const ribGeo = new THREE.TorusGeometry(localR * 1.12, localR * 0.16, 6, radial)
+      geos.push(ribGeo)
       const rib = new THREE.Mesh(ribGeo, fixedMaterial(PLACEHOLDER))
-      rib.position.set(0, 0, -l * ((i + 1) / (count + 1)))
+      rib.position.set(0, 0, -l * f)
       accent.push(rib)
       group.add(rib)
     }
@@ -316,7 +326,8 @@ function buildSight(partId: PartId, opts: BuildOpts): BuiltPart {
   const seg = segFor(opts.lod, 12, 8)
   const sz = morphLerp('sightSize', resolveMorph(opts.morph, 'sightSize'))
   const hi = morphLerp('sightHeight', resolveMorph(opts.morph, 'sightHeight'))
-  const y = 0.03 * hi
+  // 마운트 윗면(yTop) 위에 각 부품 밑면이 닿게 배치 — 높이 슬라이더로 떠오르던 버그 방지
+  const yTop = 0.015 * hi
 
   const mountGeo = new THREE.BoxGeometry(0.045 * sz, 0.02 * hi, 0.06 * sz)
   geos.push(mountGeo)
@@ -330,7 +341,7 @@ function buildSight(partId: PartId, opts: BuildOpts): BuiltPart {
     const postGeo = new THREE.CylinderGeometry(0.005 * sz, 0.007 * sz, 0.05 * hi, seg)
     geos.push(postGeo)
     const post = new THREE.Mesh(postGeo, fixedMaterial(PLACEHOLDER))
-    post.position.set(0, y, -0.02)
+    post.position.set(0, yTop + 0.025 * hi, -0.02)
     primary.push(post)
     group.add(post)
   } else if (partId === 'sight_ring') {
@@ -338,7 +349,7 @@ function buildSight(partId: PartId, opts: BuildOpts): BuiltPart {
     const ringGeo = new THREE.TorusGeometry(0.022 * sz, 0.005 * sz, 8, seg)
     geos.push(ringGeo)
     const ring = new THREE.Mesh(ringGeo, fixedMaterial(PLACEHOLDER))
-    ring.position.set(0, y + 0.005, 0)
+    ring.position.set(0, yTop + 0.022 * sz, 0)
     primary.push(ring)
     group.add(ring)
   } else if (partId === 'sight_scope') {
@@ -346,28 +357,31 @@ function buildSight(partId: PartId, opts: BuildOpts): BuiltPart {
     const tubeGeo = new THREE.CylinderGeometry(0.016 * sz, 0.016 * sz, 0.12 * sz, seg)
     tubeGeo.rotateX(Math.PI / 2)
     geos.push(tubeGeo)
+    const tubeY = yTop + 0.016 * sz
     const tube = new THREE.Mesh(tubeGeo, fixedMaterial(PLACEHOLDER))
-    tube.position.set(0, y + 0.01, -0.01)
+    tube.position.set(0, tubeY, -0.01)
     primary.push(tube)
     group.add(tube)
     const lensGeo = new THREE.CylinderGeometry(0.017 * sz, 0.017 * sz, 0.008, seg)
     lensGeo.rotateX(Math.PI / 2)
     geos.push(lensGeo)
     const lens = new THREE.Mesh(lensGeo, glowMaterial(0x7fd4ff))
-    lens.position.set(0, y + 0.01, -0.07 * sz)
+    // 렌즈는 항상 경통 앞면 바깥에 (작은 sz 에서 묻히던 버그 방지)
+    lens.position.set(0, tubeY, -0.01 - 0.06 * sz - 0.004)
     group.add(lens)
   } else {
     // 도트 사이트 — 박스 + 발광 점(고정 비색칠)
     const boxGeo = new RoundedBoxGeometry(0.05 * sz, 0.05 * sz, 0.05 * sz, 2, 0.012)
     geos.push(boxGeo)
+    const boxY = yTop + 0.025 * sz
     const box = new THREE.Mesh(boxGeo, fixedMaterial(PLACEHOLDER))
-    box.position.set(0, y, 0)
+    box.position.set(0, boxY, 0)
     primary.push(box)
     group.add(box)
     const dotGeo = new THREE.SphereGeometry(0.008 * sz, seg, seg)
     geos.push(dotGeo)
     const dot = new THREE.Mesh(dotGeo, glowMaterial(0xff3b3b))
-    dot.position.set(0, y, -0.026 * sz)
+    dot.position.set(0, boxY, -0.026 * sz)
     group.add(dot)
   }
 
@@ -394,9 +408,12 @@ function buildGrip(partId: PartId, opts: BuildOpts): BuiltPart {
 
   const gripGeo = new THREE.CapsuleGeometry(gr, 0.09 * gLen, 3, seg)
   geos.push(gripGeo)
+  const gAngle = gAng + (banana ? 0.14 : 0)
+  // 캡슐 상단을 몸통 밑면(y=0)에 살짝 겹치게 — 아래로만 자라 항상 붙는다(공중부양 방지)
+  const gy = 0.008 - (0.045 * gLen * Math.cos(gAngle) + gr)
   const g = new THREE.Mesh(gripGeo, fixedMaterial(PLACEHOLDER))
-  g.rotation.x = gAng + (banana ? 0.14 : 0) // 아래로 기울임 (슬라이더 + 파츠 개성)
-  g.position.set(0, -0.06 * gLen, 0.01)
+  g.rotation.x = gAngle
+  g.position.set(0, gy, 0.01)
   primary.push(g)
   group.add(g)
 
@@ -405,7 +422,7 @@ function buildGrip(partId: PartId, opts: BuildOpts): BuiltPart {
     geos.push(kGeo)
     const k = new THREE.Mesh(kGeo, fixedMaterial(PLACEHOLDER))
     k.rotation.y = Math.PI / 2
-    k.position.set(0, (-0.04 - i * 0.035) * gLen, 0.02)
+    k.position.set(0, gy + (0.02 - i * 0.035) * gLen, 0.02)
     accent.push(k)
     group.add(k)
   }
@@ -434,20 +451,22 @@ function buildStock(partId: PartId, opts: BuildOpts): BuiltPart {
     geos.push(balloonGeo)
     const b = new THREE.Mesh(balloonGeo, fixedMaterial(PLACEHOLDER))
     b.scale.set(1, 1.1, 1.2 * sLen)
-    b.position.set(0, 0.0, 0.14 * sLen)
+    // 구 앞면이 몸통 뒷면(z=0)에 살짝 겹치게
+    b.position.set(0, 0.0, 0.075 * sTh * 1.2 * sLen - 0.006)
     primary.push(b)
     group.add(b)
   } else {
     const armGeo = new THREE.BoxGeometry(0.05 * sTh, 0.05 * sTh, 0.14 * sLen)
     geos.push(armGeo)
     const arm = new THREE.Mesh(armGeo, fixedMaterial(PLACEHOLDER))
-    arm.position.set(0, 0.0, 0.09 * sLen)
+    // arm 앞면(z=-half)이 몸통 뒷면(z=0)에 붙게
+    arm.position.set(0, 0.0, 0.07 * sLen - 0.006)
     primary.push(arm)
     group.add(arm)
     const padGeo = new RoundedBoxGeometry(0.055 * sTh, 0.1 * sTh, 0.04, 2, 0.015)
     geos.push(padGeo)
     const pad = new THREE.Mesh(padGeo, fixedMaterial(PLACEHOLDER))
-    pad.position.set(0, 0.0, 0.17 * sLen)
+    pad.position.set(0, 0.0, 0.14 * sLen + 0.014)
     secondary.push(pad)
     group.add(pad)
   }
@@ -479,11 +498,14 @@ function buildMuzzle(partId: PartId, opts: BuildOpts): BuiltPart {
     primary.push(cone)
     group.add(cone)
     for (let i = 0; i < 3; i++) {
+      const a = (i / 3) * Math.PI * 2
       const finGeo = new THREE.BoxGeometry(0.012 * mz, 0.05 * mz, 0.06 * ml)
       geos.push(finGeo)
       const fin = new THREE.Mesh(finGeo, fixedMaterial(PLACEHOLDER))
-      fin.position.set(0, 0, -0.04 * ml)
-      fin.rotation.z = (i / 3) * Math.PI * 2
+      // 콘 반경 밖으로 밀어 세워 실제로 보이게 (원점 회전이라 안 보이던 버그 수정)
+      const rr = 0.05 * mz
+      fin.position.set(Math.sin(a) * rr, Math.cos(a) * rr, -0.04 * ml)
+      fin.rotation.z = a
       accent.push(fin)
       group.add(fin)
     }
@@ -498,7 +520,8 @@ function buildMuzzle(partId: PartId, opts: BuildOpts): BuiltPart {
     const starGeo = new THREE.OctahedronGeometry(0.035 * mz, 0)
     geos.push(starGeo)
     const star = new THREE.Mesh(starGeo, fixedMaterial(PLACEHOLDER))
-    star.position.set(0, 0, -0.06 * ml)
+    // 베이스 앞면(-0.04*ml)에 별이 물리게 (길고 작을 때 분리되던 버그 수정)
+    star.position.set(0, 0, -0.04 * ml - 0.021 * mz)
     accent.push(star)
     group.add(star)
   } else {
