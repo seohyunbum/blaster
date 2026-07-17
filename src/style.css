@@ -44,6 +44,43 @@ body {
   min-width: 0;
   min-height: 0;
 }
+
+/* ── 회전 속도 컨트롤 (공방 3D 뷰 좌하단) ── */
+.rotate-control {
+  position: absolute;
+  left: 14px;
+  bottom: 14px;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: rgba(255, 255, 255, 0.92);
+  border-radius: 999px;
+  padding: 6px 10px;
+  box-shadow: var(--shadow);
+}
+.rotate-title {
+  font-weight: 800;
+  font-size: 14px;
+  color: var(--ink);
+  margin-right: 2px;
+}
+.rotate-chip {
+  min-width: 44px;
+  height: 34px;
+  border-radius: 999px;
+  border: 2px solid var(--panel-line);
+  background: #fff;
+  color: var(--ink);
+  font-size: 13px;
+  font-weight: 800;
+  cursor: pointer;
+}
+.rotate-chip.active {
+  background: var(--accent);
+  color: #fff;
+  border-color: var(--accent);
+}
 .canvas-host canvas {
   display: block;
   width: 100%;

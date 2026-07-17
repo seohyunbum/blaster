@@ -24,6 +24,7 @@ import { createWorkshopPanel } from './ui/workshopPanel.ts'
 import { createPaintPanel } from './ui/paintPanel.ts'
 import { createRangeHud, MAG_OPTIONS } from './ui/rangeHud.ts'
 import type { AimMode, AimSel } from './ui/rangeHud.ts'
+import { createRotateControl } from './ui/rotateControl.ts'
 
 // ─── DOM ────────────────────────────────────────────────────
 const app = document.getElementById('app')!
@@ -32,6 +33,10 @@ const barHost = el('div', 'bar-host')
 const panelHost = el('div', 'panel-host')
 const hudHost = el('div', 'hud-host')
 app.append(canvasHost, barHost, panelHost, hudHost)
+
+// 공방 3D 뷰 위 회전 속도 컨트롤 오버레이
+const editOverlay = el('div', 'edit-overlay')
+canvasHost.appendChild(editOverlay)
 
 // 공방·꾸미기 패널은 각자 전용 루트에 렌더 — 전환 시 display 토글
 const wsRoot = el('div', 'panel-root')
@@ -84,7 +89,15 @@ controls.dampingFactor = 0.08
 controls.enablePan = false
 controls.minDistance = 0.5
 controls.maxDistance = 2.5
-controls.autoRotateSpeed = 1.6
+const BASE_AUTOROTATE = 1.6 // 1x 기준 속도
+let rotateSpeedMul = 1
+controls.autoRotateSpeed = BASE_AUTOROTATE
+
+/** 회전판 자동회전 적용 — 편집 모드 + 속도 배율 > 0 일 때만 돈다. */
+function applyRotation(editMode: boolean): void {
+  controls.autoRotate = editMode && rotateSpeedMul > 0
+  controls.autoRotateSpeed = BASE_AUTOROTATE * rotateSpeedMul
+}
 
 // ─── 상태 ───────────────────────────────────────────────────
 let save: SavedGame = loadSave(Date.now())
@@ -121,6 +134,15 @@ const rangeHud = createRangeHud(hudHost, {
   onExit: () => setStation('workshop'),
   onSelectMag: (mag) => selectMag(mag),
 })
+
+const rotateControl = createRotateControl(editOverlay, {
+  onSelect: (mul) => {
+    rotateSpeedMul = mul
+    applyRotation(station !== 'range')
+    rotateControl.setActive(mul)
+  },
+})
+rotateControl.setActive(1)
 
 // ─── 편집 뷰 재빌드 ─────────────────────────────────────────
 function rebuildEdit(lod?: 'drag' | 'full'): void {
@@ -163,7 +185,8 @@ function setStation(id: StationId): void {
   range.group.visible = id === 'range'
   viewmodel.visible = id === 'range'
   controls.enabled = editMode
-  controls.autoRotate = id === 'workshop'
+  applyRotation(editMode)
+  editOverlay.style.display = editMode ? '' : 'none'
 
   panelHost.style.display = editMode ? '' : 'none'
   hudHost.style.display = id === 'range' ? '' : 'none'
@@ -633,6 +656,11 @@ tick()
   hits: () => balloonHits,
   selectMag: (sel: AimSel) => selectMag(sel),
   zoomState: () => ({ aimMode, zoom, fov: Math.round(camera.fov * 100) / 100 }),
+  rotateState: () => ({
+    mul: rotateSpeedMul,
+    autoRotate: controls.autoRotate,
+    speed: Math.round(controls.autoRotateSpeed * 100) / 100,
+  }),
   /** QA용 수동 스텝 — 백그라운드 탭 rAF 스로틀 우회. dt 고정 60fps. */
   step: (n = 1) => {
     for (let i = 0; i < n; i++) {
