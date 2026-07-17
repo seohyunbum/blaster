@@ -51,10 +51,10 @@ export function makeInstance(partId: string, morph: MorphState = {}): PartInstan
 }
 
 /** 첫 실행 기본 블래스터 — 팝콘 코어 + 숏 스냅 + 도트. */
-export function createStarterBlaster(now: number): Blaster {
+export function createStarterBlaster(now: number, name = '블래스터 1'): Blaster {
   return {
     id: makeId(),
-    name: '블래스터 1',
+    name,
     createdAt: now,
     parts: {
       body: makeInstance('body_popcorn'),
@@ -62,6 +62,22 @@ export function createStarterBlaster(now: number): Blaster {
       sight: makeInstance('sight_dot'),
     },
   }
+}
+
+/** 블래스터 깊은 복사 (새 id·이름). 보관함 "복제" 용. */
+export function cloneBlaster(src: Blaster, now: number, name?: string): Blaster {
+  const parts: Blaster['parts'] = {}
+  for (const slot of Object.keys(src.parts) as (keyof Blaster['parts'])[]) {
+    const inst = src.parts[slot]
+    if (!inst) continue
+    const paint: PartInstance['paint'] = {}
+    for (const zone of ['primary', 'secondary', 'accent'] as const) {
+      const zp = inst.paint[zone]
+      if (zp) paint[zone] = { color: zp.color, finish: zp.finish }
+    }
+    parts[slot] = { partId: inst.partId, paint, morph: { ...inst.morph } }
+  }
+  return { id: makeId(), name: name ?? `${src.name} 복사`, createdAt: now, parts }
 }
 
 export function createDefaultSave(now: number): SavedGame {

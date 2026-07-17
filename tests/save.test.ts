@@ -4,6 +4,7 @@ import {
   createDefaultSave,
   normalizeSave,
   createStarterBlaster,
+  cloneBlaster,
   makeInstance,
   SAVE_VERSION,
 } from '../src/game/save.ts'
@@ -105,6 +106,26 @@ test('body 없는 블래스터는 로드에서 제외', () => {
   // body 없는 블래스터 제거 → 기본 스타터로 대체
   assert.ok(loaded.blasters.every((b) => b.parts.body))
   assert.ok(loaded.blasters.length >= 1)
+})
+
+test('cloneBlaster: 깊은 복사 — 새 id·독립 morph/paint', () => {
+  const src = createStarterBlaster(1, '내 총')
+  src.parts.body!.morph = { bodyLength: 0.8 }
+  const copy = cloneBlaster(src, 2)
+  assert.notEqual(copy.id, src.id) // 새 id
+  assert.equal(copy.name, '내 총 복사')
+  assert.equal(copy.createdAt, 2)
+  assert.deepEqual(copy.parts.body!.morph, { bodyLength: 0.8 })
+  // 독립성: 복사본 변경이 원본에 영향 없음
+  copy.parts.body!.morph.bodyLength = 0.2
+  copy.parts.body!.paint.primary = { color: 'blasterRed', finish: 'matte' }
+  assert.equal(src.parts.body!.morph.bodyLength, 0.8)
+  assert.equal(src.parts.body!.paint.primary!.color, 'blasterBlue')
+})
+
+test('cloneBlaster: 이름 지정 가능', () => {
+  const src = createStarterBlaster(1)
+  assert.equal(cloneBlaster(src, 2, '특별판').name, '특별판')
 })
 
 test('시작 파츠는 항상 unlocked 에 포함', () => {

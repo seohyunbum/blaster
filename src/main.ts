@@ -14,6 +14,8 @@ import {
   loadSave,
   persistSave,
   makeInstance,
+  createStarterBlaster,
+  cloneBlaster,
   type SavedGame,
 } from './game/save.ts'
 import { resumeAudio, sfx, setAudioEnabled } from './game/audio.ts'
@@ -25,6 +27,7 @@ import { createPaintPanel } from './ui/paintPanel.ts'
 import { createRangeHud, MAG_OPTIONS } from './ui/rangeHud.ts'
 import type { AimMode, AimSel } from './ui/rangeHud.ts'
 import { createRotateControl } from './ui/rotateControl.ts'
+import { createCollectionPanel } from './ui/collectionPanel.ts'
 
 // ─── DOM ────────────────────────────────────────────────────
 const app = document.getElementById('app')!
@@ -38,10 +41,11 @@ app.append(canvasHost, barHost, panelHost, hudHost)
 const editOverlay = el('div', 'edit-overlay')
 canvasHost.appendChild(editOverlay)
 
-// 공방·꾸미기 패널은 각자 전용 루트에 렌더 — 전환 시 display 토글
+// 공방·꾸미기·보관함 패널은 각자 전용 루트에 렌더 — 전환 시 display 토글
 const wsRoot = el('div', 'panel-root')
 const paintRoot = el('div', 'panel-root')
-panelHost.append(wsRoot, paintRoot)
+const collectionRoot = el('div', 'panel-root')
+panelHost.append(wsRoot, paintRoot, collectionRoot)
 
 // ─── 렌더러·씬·카메라 ───────────────────────────────────────
 const renderer = new THREE.WebGLRenderer({ antialias: true })
@@ -144,6 +148,14 @@ const rotateControl = createRotateControl(editOverlay, {
 })
 rotateControl.setActive(1)
 
+const collectionPanel = createCollectionPanel(collectionRoot, {
+  onNew: () => newBlaster(),
+  onOpen: (id) => openBlaster(id, 'workshop'),
+  onDuplicate: (id) => duplicateBlaster(id),
+  onRename: (id, name) => renameBlaster(id, name),
+  onDelete: (id) => deleteBlaster(id),
+})
+
 // ─── 편집 뷰 재빌드 ─────────────────────────────────────────
 function rebuildEdit(lod?: 'drag' | 'full'): void {
   if (editBuilt) {
@@ -167,6 +179,7 @@ function refreshPanels(): void {
   const stats = computeStats(active)
   workshopPanel.setBlaster(active, stats)
   paintPanel?.setBlaster(active)
+  collectionPanel.setData(save.blasters, active.id)
   stationBar.setName(active.name)
   stationBar.setCanUndo(undoStack.length > 0)
 }
@@ -179,7 +192,7 @@ function setStation(id: StationId): void {
   stationBar.setActive(id)
   autosave()
 
-  const editMode = id === 'workshop' || id === 'paint'
+  const editMode = id === 'workshop' || id === 'paint' || id === 'collection'
   app.classList.toggle('range-mode', id === 'range')
   editRoot.visible = editMode
   range.group.visible = id === 'range'
@@ -208,11 +221,84 @@ function setStation(id: StationId): void {
     }
     wsRoot.style.display = id === 'workshop' ? '' : 'none'
     paintRoot.style.display = id === 'paint' ? '' : 'none'
+    collectionRoot.style.display = id === 'collection' ? '' : 'none'
     rebuildEdit('full')
     refreshPanels()
   } else {
     enterRange()
   }
+}
+
+// ─── 보관함 (저장/불러오기) ─────────────────────────────────
+function nextBlasterName(): string {
+  let max = 0
+  for (const b of save.blasters) {
+    const m = b.name.match(/블래스터 (\d+)/)
+    if (m && m[1]) max = Math.max(max, parseInt(m[1], 10))
+  }
+  return `블래스터 ${max + 1}`
+}
+
+function newBlaster(): void {
+  const b = createStarterBlaster(Date.now(), nextBlasterName())
+  save.blasters.push(b)
+  openBlaster(b.id, 'workshop')
+}
+
+function openBlaster(id: string, goto?: StationId): void {
+  const b = save.blasters.find((x) => x.id === id)
+  if (!b) return
+  active = b
+  save.activeBlasterId = id
+  undoStack.length = 0
+  sfx.click()
+  autosave()
+  if (goto) {
+    setStation(goto)
+  } else {
+    rebuildEdit('full')
+    refreshPanels()
+  }
+}
+
+function duplicateBlaster(id: string): void {
+  const src = save.blasters.find((x) => x.id === id)
+  if (!src) return
+  const copy = cloneBlaster(src, Date.now())
+  save.blasters.push(copy)
+  active = copy
+  save.activeBlasterId = copy.id
+  undoStack.length = 0
+  sfx.snap()
+  rebuildEdit('full')
+  refreshPanels()
+  autosave()
+}
+
+function renameBlaster(id: string, name: string): void {
+  const b = save.blasters.find((x) => x.id === id)
+  if (!b) return
+  b.name = name
+  if (b.id === active.id) stationBar.setName(name)
+  refreshPanels()
+  autosave()
+}
+
+function deleteBlaster(id: string): void {
+  if (save.blasters.length <= 1) return
+  const idx = save.blasters.findIndex((x) => x.id === id)
+  if (idx < 0) return
+  const wasActive = active.id === id
+  save.blasters.splice(idx, 1)
+  if (wasActive) {
+    active = save.blasters[0]!
+    save.activeBlasterId = active.id
+    undoStack.length = 0
+    rebuildEdit('full')
+  }
+  sfx.click()
+  refreshPanels()
+  autosave()
 }
 
 // ─── 파츠 선택 ─────────────────────────────────────────────

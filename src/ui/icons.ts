@@ -38,6 +38,14 @@ export function icoShoot(): string {
   </svg>`
 }
 
+export function icoCollection(): string {
+  return `<svg viewBox="0 0 24 24" width="24" height="24" aria-hidden="true">
+    <rect x="3" y="4" width="18" height="5" rx="1.5" fill="currentColor"/>
+    <rect x="3" y="10.5" width="18" height="5" rx="1.5" fill="currentColor" opacity="0.75"/>
+    <rect x="3" y="17" width="18" height="3.5" rx="1.5" fill="currentColor" opacity="0.5"/>
+  </svg>`
+}
+
 export function icoDice(): string {
   return `<svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true">
     <rect x="4" y="4" width="16" height="16" rx="4" fill="currentColor"/>

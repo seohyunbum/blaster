@@ -1,7 +1,7 @@
 // src/ui/stationBar.ts — 상단 스테이션 탭(공방/꾸미기/사격장) + 되돌리기 (leaf).
-import { icoWorkshop, icoPaint, icoRange, icoUndo } from './icons.ts'
+import { icoWorkshop, icoPaint, icoRange, icoUndo, icoCollection } from './icons.ts'
 
-export type StationId = 'workshop' | 'paint' | 'range'
+export type StationId = 'workshop' | 'paint' | 'range' | 'collection'
 
 export interface StationCallbacks {
   onStation: (id: StationId) => void
@@ -12,6 +12,7 @@ const STATIONS: { id: StationId; label: string; ico: () => string }[] = [
   { id: 'workshop', label: '만들기', ico: icoWorkshop },
   { id: 'paint', label: '꾸미기', ico: icoPaint },
   { id: 'range', label: '쏘기', ico: icoRange },
+  { id: 'collection', label: '보관함', ico: icoCollection },
 ]
 
 export function createStationBar(root: HTMLElement, cb: StationCallbacks) {
