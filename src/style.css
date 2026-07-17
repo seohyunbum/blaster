@@ -468,13 +468,14 @@ body {
 }
 .range-hint {
   position: absolute;
-  bottom: 20px;
+  bottom: 68px;
   left: 0;
   right: 0;
   text-align: center;
-  color: rgba(37, 48, 70, 0.75);
+  color: rgba(37, 48, 70, 0.85);
   font-weight: 700;
   font-size: 14px;
+  text-shadow: 0 1px 3px rgba(255, 255, 255, 0.6);
 }
 .hit-number {
   position: absolute;
@@ -541,49 +542,48 @@ body {
 }
 .zoom-control {
   position: absolute;
-  right: 18px;
-  bottom: 54px;
+  left: 50%;
+  bottom: 14px;
+  transform: translateX(-50%);
   display: flex;
   align-items: center;
-  gap: 6px;
-  background: rgba(255, 255, 255, 0.92);
-  border-radius: 999px;
-  padding: 6px 8px;
+  gap: 10px;
+  max-width: 94%;
+  background: rgba(255, 255, 255, 0.94);
+  border-radius: 16px;
+  padding: 8px 14px;
   pointer-events: auto;
   box-shadow: var(--shadow);
 }
-.scope-btn {
-  border: none;
-  background: #eef2f7;
-  color: var(--ink);
-  border-radius: 999px;
-  padding: 8px 14px;
+.zoom-title {
   font-weight: 800;
-  font-size: 14px;
-  cursor: pointer;
+  font-size: 15px;
+  color: var(--ink);
+  white-space: nowrap;
 }
-.scope-btn.active {
-  background: var(--accent);
-  color: #fff;
+.mag-list {
+  display: flex;
+  gap: 5px;
+  flex-wrap: nowrap;
+  overflow-x: auto;
+  padding-bottom: 2px;
 }
-.zoom-step {
-  width: 36px;
-  height: 36px;
-  border-radius: 50%;
+.mag-chip {
+  flex: 0 0 auto;
+  min-width: 42px;
+  height: 38px;
+  border-radius: 10px;
   border: 2px solid var(--panel-line);
   background: #fff;
   color: var(--ink);
-  font-size: 20px;
-  font-weight: 900;
+  font-size: 14px;
+  font-weight: 800;
   cursor: pointer;
-  line-height: 1;
 }
-.mag-label {
-  min-width: 42px;
-  text-align: center;
-  font-weight: 900;
-  font-size: 16px;
-  color: var(--ink);
+.mag-chip.active {
+  background: var(--accent);
+  color: #fff;
+  border-color: var(--accent);
 }
 
 .result-overlay {

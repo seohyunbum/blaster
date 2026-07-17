@@ -118,8 +118,7 @@ const rangeHud = createRangeHud(hudHost, {
   onBack: () => finishRange(),
   onRetry: () => retryRange(),
   onExit: () => setStation('workshop'),
-  onToggleScope: () => setScope(!scoped),
-  onZoomDelta: (d) => changeZoom(d),
+  onSelectMag: (mag) => selectMag(mag),
 })
 
 // ─── 편집 뷰 재빌드 ─────────────────────────────────────────
@@ -382,18 +381,28 @@ function applyView(): void {
   camera.updateProjectionMatrix()
 }
 
-function setScope(on: boolean): void {
-  scoped = on
+/** 배율 선택 — null=일반(끄기), 4~15=그 배율로 조준경 켜기 (조준경 시스템). */
+function selectMag(mag: number | null): void {
+  if (mag === null) {
+    scoped = false
+  } else {
+    scoped = true
+    zoom = Math.max(ZOOM_MIN, Math.min(ZOOM_MAX, Math.round(mag)))
+  }
   applyView()
-  rangeHud.setScope(on)
+  rangeHud.setMagSelection(scoped, zoom)
   sfx.click()
 }
 
-function changeZoom(delta: number): void {
-  zoom = Math.max(ZOOM_MIN, Math.min(ZOOM_MAX, zoom + delta))
-  if (!scoped) setScope(true) // 배율 조절 = 조준경 켜기
-  else applyView()
-  rangeHud.setMag(zoom)
+/** 휠 편의 — 배율 선택지를 한 칸씩 이동(맨 아래에서 더 내리면 일반). */
+function stepMag(delta: number): void {
+  if (!scoped) {
+    if (delta > 0) selectMag(ZOOM_MIN)
+    return
+  }
+  const next = zoom + delta
+  if (next < ZOOM_MIN) selectMag(null)
+  else selectMag(Math.min(ZOOM_MAX, next))
 }
 
 range.onHit = (e) => {
@@ -419,8 +428,7 @@ function enterRange(): void {
   scoped = false
   zoom = ZOOM_MIN
   applyView()
-  rangeHud.setScope(false)
-  rangeHud.setMag(zoom)
+  rangeHud.setMagSelection(false, zoom)
   camera.position.set(0, 1.5, 0.2)
   composeAim()
   rebuildViewmodel()
@@ -514,20 +522,20 @@ window.addEventListener('pointerup', () => {
   pointerDown = false
   if (moved < 8) fire()
 })
-// 휠 = 배율 조절(확대/축소), 우클릭 = 조준경 토글
+// 휠 = 배율 한 칸씩 이동, 우클릭 = 조준경 켜기/끄기 토글
 renderer.domElement.addEventListener(
   'wheel',
   (ev) => {
     if (station !== 'range') return
     ev.preventDefault()
-    changeZoom(ev.deltaY < 0 ? 1 : -1)
+    stepMag(ev.deltaY < 0 ? 1 : -1)
   },
   { passive: false },
 )
 renderer.domElement.addEventListener('contextmenu', (ev) => {
   if (station !== 'range') return
   ev.preventDefault()
-  setScope(!scoped)
+  selectMag(scoped ? null : zoom)
 })
 
 // ─── 루프 ──────────────────────────────────────────────────
@@ -601,8 +609,7 @@ tick()
     composeAim()
   },
   hits: () => balloonHits,
-  setScope: (on: boolean) => setScope(on),
-  changeZoom: (d: number) => changeZoom(d),
+  selectMag: (mag: number | null) => selectMag(mag),
   zoomState: () => ({ scoped, zoom, fov: Math.round(camera.fov * 100) / 100 }),
   /** QA용 수동 스텝 — 백그라운드 탭 rAF 스로틀 우회. dt 고정 60fps. */
   step: (n = 1) => {

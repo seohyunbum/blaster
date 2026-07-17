@@ -5,9 +5,12 @@ export interface RangeHudCallbacks {
   onBack: () => void // 상단 "공방으로" — 라운드 종료(결과 표시)
   onRetry: () => void // 결과 카드 "한 번 더"
   onExit: () => void // 결과 카드 "공방으로" — 공방으로 실제 이동
-  onToggleScope: () => void
-  onZoomDelta: (delta: number) => void
+  /** 배율 선택 — null = 조준경 끄기(일반), 4~15 = 그 배율로 조준경 켜기. */
+  onSelectMag: (mag: number | null) => void
 }
+
+/** 조준경 배율 선택지 (4~15배). */
+export const MAG_OPTIONS: readonly number[] = [4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15]
 
 export function createRangeHud(root: HTMLElement, cb: RangeHudCallbacks) {
   root.innerHTML = ''
@@ -33,7 +36,7 @@ export function createRangeHud(root: HTMLElement, cb: RangeHudCallbacks) {
 
   const hint = document.createElement('div')
   hint.className = 'range-hint'
-  hint.textContent = '끌어서 조준 · 눌러서 발사 · 휠이나 조준경으로 확대'
+  hint.textContent = '끌어서 조준 · 눌러서 발사 · 아래에서 배율(4~15배)을 골라 조준'
   root.appendChild(hint)
 
   // 스코프 오버레이 (조준경 ON 일 때 원형 비네트)
@@ -43,26 +46,29 @@ export function createRangeHud(root: HTMLElement, cb: RangeHudCallbacks) {
     '<div class="scope-ring"></div><div class="scope-cross-v"></div><div class="scope-cross-h"></div>'
   root.appendChild(scope)
 
-  // 배율 컨트롤
+  // 배율 선택 시스템 — 일반(끄기) + 4~15배 중 하나 선택
   const zoomCtl = document.createElement('div')
   zoomCtl.className = 'zoom-control'
-  const scopeBtn = document.createElement('button')
-  scopeBtn.className = 'scope-btn'
-  scopeBtn.textContent = '조준경'
-  scopeBtn.addEventListener('click', () => cb.onToggleScope())
-  const minus = document.createElement('button')
-  minus.className = 'zoom-step'
-  minus.textContent = '−'
-  minus.addEventListener('click', () => cb.onZoomDelta(-1))
-  const magLabel = document.createElement('div')
-  magLabel.className = 'mag-label'
-  magLabel.textContent = '4배'
-  const plus = document.createElement('button')
-  plus.className = 'zoom-step'
-  plus.textContent = '+'
-  plus.addEventListener('click', () => cb.onZoomDelta(1))
-  zoomCtl.append(scopeBtn, minus, magLabel, plus)
+  const title = document.createElement('span')
+  title.className = 'zoom-title'
+  title.textContent = '조준경'
+  zoomCtl.appendChild(title)
+  const magList = document.createElement('div')
+  magList.className = 'mag-list'
+  zoomCtl.appendChild(magList)
   root.appendChild(zoomCtl)
+
+  const magChips: { mag: number | null; el: HTMLButtonElement }[] = []
+  const addChip = (mag: number | null, label: string): void => {
+    const b = document.createElement('button')
+    b.className = 'mag-chip'
+    b.textContent = label
+    b.addEventListener('click', () => cb.onSelectMag(mag))
+    magList.appendChild(b)
+    magChips.push({ mag, el: b })
+  }
+  addChip(null, '일반')
+  for (const m of MAG_OPTIONS) addChip(m, `${m}배`)
 
   const result = document.createElement('div')
   result.className = 'result-overlay hidden'
@@ -85,15 +91,12 @@ export function createRangeHud(root: HTMLElement, cb: RangeHudCallbacks) {
       const size = 18 + spreadDeg * 14
       cross.style.setProperty('--ring-size', `${size}px`)
     },
-    /** 조준경 ON/OFF — 스코프 비네트 + 일반 조준점 숨김. */
-    setScope(on: boolean): void {
-      scope.classList.toggle('hidden', !on)
-      scopeBtn.classList.toggle('active', on)
-      cross.style.display = on ? 'none' : ''
-    },
-    /** 현재 배율 표시. */
-    setMag(zoom: number): void {
-      magLabel.textContent = `${zoom}배`
+    /** 배율 선택 상태 반영 — 스코프 비네트·조준점·선택 칩 하이라이트. */
+    setMagSelection(scopedOn: boolean, zoom: number): void {
+      scope.classList.toggle('hidden', !scopedOn)
+      cross.style.display = scopedOn ? 'none' : ''
+      const active: number | null = scopedOn ? zoom : null
+      for (const c of magChips) c.el.classList.toggle('active', c.mag === active)
     },
     showResult(stars: 0 | 1 | 2 | 3, hitCount: number): void {
       result.innerHTML =
