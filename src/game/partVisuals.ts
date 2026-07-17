@@ -224,7 +224,8 @@ function buildBarrel(partId: PartId, opts: BuildOpts): BuiltPart {
   const flareT = morphLerp('barrelFlare', resolveMorph(opts.morph, 'barrelFlare'))
   if (flareT > 0.02) {
     const flareLen = 0.03 + 0.06 * flareT
-    const flareGeo = new THREE.CylinderGeometry(rFront + 0.04 * flareT, rFront, flareLen, radial, 1, true)
+    // 접합부(뒤끝)=rFront(연속), 앞끝=넓게 → 벨 입구가 전방(-Z)으로 벌어지는 나팔
+    const flareGeo = new THREE.CylinderGeometry(rFront, rFront + 0.04 * flareT, flareLen, radial, 1, true)
     flareGeo.rotateX(Math.PI / 2)
     geos.push(flareGeo)
     const flare = new THREE.Mesh(flareGeo, fixedMaterial(PLACEHOLDER))
