@@ -51,18 +51,21 @@ export function paintMaterial(color: string, finish: Finish): THREE.MeshStandard
 }
 
 // 고정(비색칠) 머티리얼 — 안전팁 주황·발광 dot·투명창.
-let glowDotMat: THREE.MeshStandardMaterial | null = null
+// hex 별로 캐시 (단일 싱글턴이면 첫 색이 이후 모든 발광 파츠를 덮어씀 — QA 지적)
+const glowCache = new Map<number, THREE.MeshStandardMaterial>()
 export function glowMaterial(hex: number): THREE.MeshStandardMaterial {
-  if (!glowDotMat) {
-    glowDotMat = new THREE.MeshStandardMaterial({
+  let m = glowCache.get(hex)
+  if (!m) {
+    m = new THREE.MeshStandardMaterial({
       color: hex,
       emissive: hex,
       emissiveIntensity: 0.6,
       roughness: 0.28,
       metalness: 0.04,
     })
+    glowCache.set(hex, m)
   }
-  return glowDotMat
+  return m
 }
 
 const fixedCache = new Map<number, THREE.MeshStandardMaterial>()

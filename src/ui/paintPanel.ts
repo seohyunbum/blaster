@@ -2,6 +2,7 @@
 import type { Blaster, Finish, SlotType, ZoneId } from '../game/types.ts'
 import { ALL_PALETTE_KEYS, isBright, TOY_PALETTE, type PaletteKey } from '../game/palette.ts'
 import { paintableZones } from '../game/assembly.ts'
+import { PRESETS } from '../game/presets.ts'
 
 export interface PaintCallbacks {
   onSelectPaintPart: (slot: SlotType) => void
@@ -22,13 +23,7 @@ const FINISHES: { finish: Finish; label: string }[] = [
   { finish: 'metal', label: '메탈' },
 ]
 
-// 프리셋 = 정본 팔레트 키의 이름있는 묶음 (00_DECISIONS R4). [primary(밝음), secondary, accent]
-const PRESETS: { name: string; keys: [PaletteKey, PaletteKey, PaletteKey] }[] = [
-  { name: '파스텔', keys: ['pastelSky', 'pastelCream', 'pastelPink'] },
-  { name: '네온', keys: ['blasterGreen', 'toyBlack', 'blasterYellow'] },
-  { name: '레이싱', keys: ['blasterRed', 'toyGrayLight', 'toyBlack'] },
-  { name: '우주', keys: ['pastelSky', 'toyGrayDark', 'blasterYellow'] },
-]
+// 프리셋 정본 = src/game/presets.ts (미리보기와 실제 적용이 같은 배열을 공유)
 
 export function createPaintPanel(root: HTMLElement, cb: PaintCallbacks) {
   let blaster: Blaster | null = null

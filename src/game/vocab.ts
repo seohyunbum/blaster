@@ -59,8 +59,11 @@ export function scanIdentifier(id: string): VocabHit[] {
   return hits
 }
 
-/** 한글이 섞였으면 KO 스캔, 순수 식별자면 EN 스캔. */
+/**
+ * 한글·영문 스캔을 항상 병행한다.
+ * (구현: 한글이 있으면 KO 만 돌려서 "glock 배럴" 같은 혼합 문자열이 EN 토큰 검사를
+ *  통째로 건너뛰던 사각이 있었다 — QA 지적)
+ */
 export function scanString(s: string): VocabHit[] {
-  const hasKo = /[가-힣]/.test(s)
-  return hasKo ? scanKo(s) : scanIdentifier(s)
+  return [...scanKo(s), ...scanIdentifier(s)]
 }
