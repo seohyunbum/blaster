@@ -11,12 +11,31 @@ import {
   ENVELOPE,
 } from '../src/game/morph.ts'
 
-test('resolveMorph: 없거나 NaN 은 0.5, 범위 밖은 clamp', () => {
-  assert.equal(resolveMorph({}, 'bodyLength'), 0.5)
+test('resolveMorph: 모양=기본0.5·장식=기본0, 범위 밖은 clamp', () => {
+  assert.equal(resolveMorph({}, 'bodyLength'), 0.5) // 모양
+  assert.equal(resolveMorph({}, 'bodyFin'), 0) // 장식 = 기본 없음
+  assert.equal(resolveMorph({}, 'bodyAntenna'), 0)
+  assert.equal(resolveMorph({}, 'barrelFlare'), 0)
   assert.equal(resolveMorph({ bodyLength: NaN }, 'bodyLength'), 0.5)
+  assert.equal(resolveMorph({ bodyFin: NaN }, 'bodyFin'), 0)
   assert.equal(resolveMorph({ bodyLength: -3 }, 'bodyLength'), 0)
   assert.equal(resolveMorph({ bodyLength: 9 }, 'bodyLength'), 1)
   assert.equal(resolveMorph({ bodyLength: 0.8 }, 'bodyLength'), 0.8)
+})
+
+test('장식 파라미터는 스탯에 영향 없음 (순수 멋)', () => {
+  for (const key of ['bodyFin', 'bodyCrest', 'bodyAntenna', 'barrelFlare'] as const) {
+    for (const t of [0, 0.5, 1]) {
+      assert.deepEqual(morphStatDelta(key, t), {}, `${key} at ${t}`)
+    }
+  }
+})
+
+test('pruneMorph: 장식 기본값(0)도 생략', () => {
+  const p = pruneMorph({ bodyFin: 0, bodyCrest: 0.7, bodyLength: 0.5 })
+  assert.equal(p.bodyFin, undefined) // 0 = 장식 기본 → 생략
+  assert.equal(p.bodyCrest, 0.7)
+  assert.equal(p.bodyLength, undefined) // 0.5 = 모양 기본 → 생략
 })
 
 test('morphStatDelta: t=0.5 는 전 파라미터에서 0', () => {

@@ -11,21 +11,37 @@ const M1_PARTS = [
   'stock_pad', 'stock_spring', 'stock_balloon',
   'muzzle_horn', 'muzzle_booster', 'muzzle_star',
 ]
-const EXTREMES: MorphState[] = [
-  {},
-  { bodyLength: 0, bodyChub: 0, bodyNose: 0, barrelLength: 0, barrelBore: 0 },
-  { bodyLength: 1, bodyChub: 1, bodyNose: 1, barrelLength: 1, barrelBore: 1 },
+// 모든 morph 키(모양+장식)를 0/1 로 몰아 극단 검사 — 장식 전부 켜면 메시 최대
+const ALL_KEYS: MorphKey[] = [
+  'bodyLength', 'bodyChub', 'bodyNose', 'bodyRound', 'bodyFin', 'bodyCrest', 'bodyAntenna',
+  'barrelLength', 'barrelBore', 'barrelTaper', 'barrelFlare',
 ]
+function fill(v: number): MorphState {
+  const m: MorphState = {}
+  for (const k of ALL_KEYS) m[k] = v
+  return m
+}
+const EXTREMES: MorphState[] = [{}, fill(0), fill(1), fill(0.5)]
 
-test('메시 수 ≤ 6 — 극단 morph 포함 (verify 게이트 §8-1)', () => {
+const MESH_BUDGET = 10 // 몸통 장식 전부 켜면 5기본+5장식
+
+test('메시 수 ≤ 10 — 극단 morph(장식 포함) (verify 게이트 §8-1)', () => {
   for (const id of M1_PARTS) {
     for (const morph of EXTREMES) {
       const built = buildPart(id, { morph })
       const n = countMeshes(built.group)
-      assert.ok(n <= 6, `${id} morph ${JSON.stringify(morph)} → ${n} meshes`)
+      assert.ok(n <= MESH_BUDGET, `${id} morph ${JSON.stringify(morph)} → ${n} meshes`)
       built.dispose()
     }
   }
+})
+
+test('장식 슬라이더가 메시를 추가한다 (기본 없음 → 켜면 생김)', () => {
+  const off = buildPart('body_popcorn', { morph: {} })
+  const on = buildPart('body_popcorn', { morph: { bodyFin: 1, bodyCrest: 1, bodyAntenna: 1 } })
+  assert.ok(countMeshes(on.group) > countMeshes(off.group), '장식이 메시를 안 늘림')
+  off.dispose()
+  on.dispose()
 })
 
 test('zones.primary 존재 + 메시 ≥ 1 (색칠 가능)', () => {

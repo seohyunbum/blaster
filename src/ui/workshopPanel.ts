@@ -116,41 +116,51 @@ export function createWorkshopPanel(root: HTMLElement, cb: WorkshopCallbacks) {
       morphWrap.appendChild(hint)
       return
     }
-    const title = document.createElement('div')
-    title.className = 'morph-title'
-    title.textContent = '모양 바꾸기'
-    morphWrap.appendChild(title)
+    const params = morphParamsFor(arche)
+    const groups: { g: 'shape' | 'deco'; title: string }[] = [
+      { g: 'shape', title: '모양 바꾸기' },
+      { g: 'deco', title: '장식 붙이기' },
+    ]
+    for (const grp of groups) {
+      const inGroup = params.filter((p) => p.group === grp.g)
+      if (inGroup.length === 0) continue
+      const title = document.createElement('div')
+      title.className = 'morph-title'
+      title.textContent = grp.title
+      morphWrap.appendChild(title)
 
-    for (const p of morphParamsFor(arche)) {
-      const t = resolveMorph(inst.morph, p.key)
-      const row = document.createElement('div')
-      row.className = 'morph-row'
-      const lab = document.createElement('div')
-      lab.className = 'morph-label'
-      lab.innerHTML = `<span>${p.labelKo}</span>`
-      const ends = document.createElement('div')
-      ends.className = 'morph-ends'
-      ends.innerHTML = `<span>${p.minLabelKo}</span><span>${p.maxLabelKo}</span>`
-      const input = document.createElement('input')
-      input.type = 'range'
-      input.min = '0'
-      input.max = '1'
-      input.step = '0.01'
-      input.value = String(t)
-      input.className = 'morph-slider'
-      input.addEventListener('input', () => {
-        const v = snapCenter(parseFloat(input.value))
-        cb.onMorphInput(activeSlot, p.key, v)
-      })
-      input.addEventListener('change', () => {
-        const v = snapCenter(parseFloat(input.value))
-        input.value = String(v)
-        cb.onMorphCommit(activeSlot, p.key, v)
-      })
-      row.appendChild(lab)
-      row.appendChild(input)
-      row.appendChild(ends)
-      morphWrap.appendChild(row)
+      for (const p of inGroup) {
+        const t = resolveMorph(inst.morph, p.key)
+        const isShape = p.group === 'shape'
+        const row = document.createElement('div')
+        row.className = 'morph-row'
+        const lab = document.createElement('div')
+        lab.className = 'morph-label'
+        lab.innerHTML = `<span>${p.labelKo}</span>`
+        const ends = document.createElement('div')
+        ends.className = 'morph-ends'
+        ends.innerHTML = `<span>${p.minLabelKo}</span><span>${p.maxLabelKo}</span>`
+        const input = document.createElement('input')
+        input.type = 'range'
+        input.min = '0'
+        input.max = '1'
+        input.step = '0.01'
+        input.value = String(t)
+        input.className = 'morph-slider'
+        const snap = (raw: number): number => (isShape ? snapCenter(raw) : raw)
+        input.addEventListener('input', () => {
+          cb.onMorphInput(activeSlot, p.key, snap(parseFloat(input.value)))
+        })
+        input.addEventListener('change', () => {
+          const v = snap(parseFloat(input.value))
+          input.value = String(v)
+          cb.onMorphCommit(activeSlot, p.key, v)
+        })
+        row.appendChild(lab)
+        row.appendChild(input)
+        row.appendChild(ends)
+        morphWrap.appendChild(row)
+      }
     }
 
     const rnd = document.createElement('button')

@@ -1,79 +1,175 @@
 // src/game/morph.ts — 자유 변형(파라메트릭 조형) 정본 데이터 + 순수 함수 (leaf).
-// 저장·UI·undo 전부 t ∈ [0,1] 만 다룬다. t=0.5 = 기본형(변형 없음). 상세 정본 = docs/design/09_freeform.md
+// 저장·UI·undo 전부 t ∈ [0,1]. 모양(shape) 파라미터는 기본 0.5(변형 없음),
+// 장식(deco) 파라미터는 기본 0(없음). 상세 정본 = docs/design/09_freeform.md
 import type { MorphKey, MorphState, StatDelta } from './types.ts'
 
 export type MorphArchetype = 'body' | 'barrel'
+export type MorphGroup = 'shape' | 'deco'
 
 export interface MorphParamDef {
   key: MorphKey
   archetype: MorphArchetype
+  group: MorphGroup
   labelKo: string
   minLabelKo: string
   maxLabelKo: string
-  /** 지오메트리 lerp 범위 (배율 또는 형태계수). 빌더가 lerp(min,max,t) 로 실측 계산. */
+  /** 지오메트리 lerp 범위. 빌더가 lerp(min,max,t) 로 실측 계산. */
   min: number
   max: number
-  /** t=0(왼끝)·t=1(오른끝) 스탯 델타. piecewise 두-기울기로 t=0.5 에서 0. */
+  /** 미지정 시 기본 t. shape=0.5(중립), deco=0(없음). */
+  defaultT: number
+  /** t=0·t=1 스탯 델타. piecewise 두-기울기로 t=0.5 에서 0. 장식은 전부 {} (순수 멋). */
   deltaAt0: StatDelta
   deltaAt1: StatDelta
 }
 
-// 09 §2·§4 정본 표. 범위는 §7 봉투 검산을 통과하도록 사전 보정된 값.
 export const MORPH_PARAMS: readonly MorphParamDef[] = [
+  // ── 몸통 · 모양 ──
   {
     key: 'bodyLength',
     archetype: 'body',
+    group: 'shape',
     labelKo: '길이',
     minLabelKo: '짧게',
     maxLabelKo: '길쭉하게',
     min: 0.75,
     max: 1.25,
+    defaultT: 0.5,
     deltaAt0: { fireRate: 0.5, accuracy: -1.0 },
     deltaAt1: { fireRate: -0.5, accuracy: 1.0 },
   },
   {
     key: 'bodyChub',
     archetype: 'body',
+    group: 'shape',
     labelKo: '통통함',
     minLabelKo: '홀쭉',
     maxLabelKo: '통통',
     min: 0.85,
     max: 1.35,
+    defaultT: 0.5,
     deltaAt0: { power: -1.5, weight: -1.5 },
     deltaAt1: { power: 1.5, weight: 1.5, fireRate: -1.0 },
   },
   {
     key: 'bodyNose',
     archetype: 'body',
+    group: 'shape',
     labelKo: '코 모양',
     minLabelKo: '뭉툭',
     maxLabelKo: '쫑긋',
     min: 0,
     max: 1,
+    defaultT: 0.5,
     deltaAt0: {},
-    deltaAt1: {}, // 순수 멋 — 스탯 0
+    deltaAt1: {},
   },
+  {
+    key: 'bodyRound',
+    archetype: 'body',
+    group: 'shape',
+    labelKo: '모서리',
+    minLabelKo: '각지게',
+    maxLabelKo: '둥글게',
+    min: 0.08,
+    max: 0.42, // 최소변 대비 라운드 반경 비율. t=0.5 → 0.25(기존 룩)
+    defaultT: 0.5,
+    deltaAt0: {},
+    deltaAt1: {},
+  },
+  // ── 몸통 · 장식 (기본 없음) ──
+  {
+    key: 'bodyFin',
+    archetype: 'body',
+    group: 'deco',
+    labelKo: '옆날개',
+    minLabelKo: '없음',
+    maxLabelKo: '큰 날개',
+    min: 0,
+    max: 1,
+    defaultT: 0,
+    deltaAt0: {},
+    deltaAt1: {},
+  },
+  {
+    key: 'bodyCrest',
+    archetype: 'body',
+    group: 'deco',
+    labelKo: '등지느러미',
+    minLabelKo: '없음',
+    maxLabelKo: '멋진 볏',
+    min: 0,
+    max: 1,
+    defaultT: 0,
+    deltaAt0: {},
+    deltaAt1: {},
+  },
+  {
+    key: 'bodyAntenna',
+    archetype: 'body',
+    group: 'deco',
+    labelKo: '안테나',
+    minLabelKo: '없음',
+    maxLabelKo: '긴 안테나',
+    min: 0,
+    max: 1,
+    defaultT: 0,
+    deltaAt0: {},
+    deltaAt1: {},
+  },
+  // ── 배럴 · 모양 ──
   {
     key: 'barrelLength',
     archetype: 'barrel',
+    group: 'shape',
     labelKo: '길이',
     minLabelKo: '짧게',
     maxLabelKo: '길쭉하게',
     min: 0.7,
     max: 1.25,
+    defaultT: 0.5,
     deltaAt0: { accuracy: -1.5, weight: -1.0 },
     deltaAt1: { accuracy: 1.5, weight: 1.0, fireRate: -0.5 },
   },
   {
     key: 'barrelBore',
     archetype: 'barrel',
+    group: 'shape',
     labelKo: '굵기',
     minLabelKo: '가늘게',
     maxLabelKo: '두툼하게',
     min: 0.9,
     max: 1.55,
+    defaultT: 0.5,
     deltaAt0: { power: -1.0 },
     deltaAt1: { power: 1.0, accuracy: -0.5 },
+  },
+  {
+    key: 'barrelTaper',
+    archetype: 'barrel',
+    group: 'shape',
+    labelKo: '뿔 모양',
+    minLabelKo: '앞이 넓게',
+    maxLabelKo: '앞이 뾰족',
+    min: 1.45,
+    max: 0.55, // 앞끝 반경 배율. t=0.5 → 1.0(일자)
+    defaultT: 0.5,
+    deltaAt0: { power: 0.5, accuracy: -0.5 },
+    deltaAt1: { accuracy: 0.5 },
+  },
+  // ── 배럴 · 장식 (기본 없음) ──
+  {
+    key: 'barrelFlare',
+    archetype: 'barrel',
+    group: 'deco',
+    labelKo: '나팔 끝',
+    minLabelKo: '없음',
+    maxLabelKo: '큰 나팔',
+    min: 0,
+    max: 1,
+    defaultT: 0,
+    deltaAt0: {},
+    deltaAt1: {},
   },
 ]
 
@@ -85,10 +181,10 @@ export function morphParamsFor(archetype: MorphArchetype): MorphParamDef[] {
   return MORPH_PARAMS.filter((p) => p.archetype === archetype)
 }
 
-/** 없으면 0.5, NaN/범위 밖은 clamp. */
+/** 미지정/NaN 이면 파라미터 기본 t(shape 0.5·deco 0), 범위 밖은 clamp. */
 export function resolveMorph(state: MorphState, key: MorphKey): number {
   const v = state[key]
-  if (v === undefined || Number.isNaN(v)) return 0.5
+  if (v === undefined || Number.isNaN(v)) return PARAM_BY_KEY.get(key)?.defaultT ?? 0.5
   return v < 0 ? 0 : v > 1 ? 1 : v
 }
 
@@ -100,17 +196,17 @@ export function morphLerp(key: MorphKey, t: number): number {
   return p.min + (p.max - p.min) * tt
 }
 
-/** piecewise 두-기울기 스탯 델타 (09 §4). t=0.5 → 전부 0. */
+/** piecewise 두-기울기 스탯 델타 (09 §4). t=0.5 → 전부 0. 장식은 항상 0. */
 export function morphStatDelta(key: MorphKey, t: number): StatDelta {
   const p = PARAM_BY_KEY.get(key)
   if (!p) return {}
   const tt = t < 0 ? 0 : t > 1 ? 1 : t
   const out: Required<StatDelta> = { power: 0, fireRate: 0, accuracy: 0, weight: 0 }
   if (tt < 0.5) {
-    const w = 1 - tt / 0.5 // t=0 → 1, t=0.5 → 0
+    const w = 1 - tt / 0.5
     accumulate(out, p.deltaAt0, w)
   } else {
-    const w = (tt - 0.5) / 0.5 // t=0.5 → 0, t=1 → 1
+    const w = (tt - 0.5) / 0.5
     accumulate(out, p.deltaAt1, w)
   }
   return stripZero(out)
@@ -126,12 +222,12 @@ export function morphStateDelta(state: MorphState): StatDelta {
   return stripZero(out)
 }
 
-/** 저장 직전 정리 — 기본값(0.5) 키는 생략(희소 Record). */
+/** 저장 직전 정리 — 기본값과 같은 키는 생략(희소 Record). */
 export function pruneMorph(state: MorphState): MorphState {
   const out: MorphState = {}
   for (const p of MORPH_PARAMS) {
     const v = state[p.key]
-    if (v !== undefined && !Number.isNaN(v) && Math.abs(v - 0.5) > 1e-6) {
+    if (v !== undefined && !Number.isNaN(v) && Math.abs(v - p.defaultT) > 1e-6) {
       out[p.key] = v < 0 ? 0 : v > 1 ? 1 : v
     }
   }
@@ -144,7 +240,7 @@ export function boreScaleFromMorph(state: MorphState): number {
   return 0.9 + (1.3 - 0.9) * t
 }
 
-// ─── 토이 프로포션 봉투 상수 (09 §7 — 매직넘버를 여기 모은다) ───
+// ─── 토이 프로포션 봉투 상수 (09 §7) ───
 export const ENVELOPE = {
   bodyAspectMax: 4.2,
   barrelLoverRMax: 15,

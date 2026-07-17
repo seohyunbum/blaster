@@ -66,7 +66,9 @@ function buildBody(partId: PartId, opts: BuildOpts): BuiltPart {
   const accent: THREE.Mesh[] = []
 
   const boxSeg = segFor(opts.lod, 4, 2)
-  const radius = Math.min(0.045, 0.25 * Math.min(w, h))
+  const minSide = Math.min(w, h)
+  const roundFactor = morphLerp('bodyRound', resolveMorph(opts.morph, 'bodyRound'))
+  const radius = Math.min(0.49 * minSide, roundFactor * minSide)
   const shellGeo = new RoundedBoxGeometry(w, h, d, boxSeg, radius)
   geos.push(shellGeo)
   const shell = new THREE.Mesh(shellGeo, fixedMaterial(PLACEHOLDER))
@@ -111,6 +113,49 @@ function buildBody(partId: PartId, opts: BuildOpts): BuiltPart {
   primary.push(cap)
   group.add(cap)
 
+  // ── 장식 (켰을 때만 생성) ──
+  const finT = morphLerp('bodyFin', resolveMorph(opts.morph, 'bodyFin'))
+  if (finT > 0.02) {
+    const finH = h * (0.35 + 0.9 * finT)
+    const finGeo = new THREE.BoxGeometry(0.012, finH, d * 0.5)
+    geos.push(finGeo)
+    for (const sx of [-1, 1]) {
+      const fin = new THREE.Mesh(finGeo, fixedMaterial(PLACEHOLDER))
+      fin.position.set(sx * (w * 0.5 + 0.006), -h * 0.05, d * 0.02)
+      fin.rotation.z = sx * -0.25
+      accent.push(fin)
+      group.add(fin)
+    }
+  }
+  const crestT = morphLerp('bodyCrest', resolveMorph(opts.morph, 'bodyCrest'))
+  if (crestT > 0.02) {
+    const crestH = h * (0.3 + 0.9 * crestT)
+    const crestGeo = new THREE.BoxGeometry(0.014, crestH, d * 0.42)
+    geos.push(crestGeo)
+    const crest = new THREE.Mesh(crestGeo, fixedMaterial(PLACEHOLDER))
+    crest.position.set(0, h * 0.5 + crestH * 0.4, d * 0.03)
+    crest.rotation.x = -0.12
+    accent.push(crest)
+    group.add(crest)
+  }
+  const antT = morphLerp('bodyAntenna', resolveMorph(opts.morph, 'bodyAntenna'))
+  if (antT > 0.02) {
+    const antLen = 0.03 + 0.11 * antT
+    const seg = segFor(opts.lod, 8, 6)
+    const poleGeo = new THREE.CylinderGeometry(0.004, 0.006, antLen, seg)
+    geos.push(poleGeo)
+    const pole = new THREE.Mesh(poleGeo, fixedMaterial(PLACEHOLDER))
+    pole.position.set(w * 0.28, h * 0.5 + antLen * 0.5, d * 0.28)
+    secondary.push(pole)
+    group.add(pole)
+    const ballGeo = new THREE.SphereGeometry(0.014, seg, seg)
+    geos.push(ballGeo)
+    const ball = new THREE.Mesh(ballGeo, fixedMaterial(PLACEHOLDER))
+    ball.position.set(w * 0.28, h * 0.5 + antLen, d * 0.28)
+    accent.push(ball)
+    group.add(ball)
+  }
+
   // 소켓 앵커 — morph 반영 (09 §3.3)
   const barrelAnchor = new THREE.Object3D()
   barrelAnchor.position.set(0, h * 0.08, -halfZ - noseLen)
@@ -147,7 +192,9 @@ function buildBarrel(partId: PartId, opts: BuildOpts): BuiltPart {
   const dims = BARREL_DIMS[partId] ?? BARREL_DIMS.barrel_snap!
   const bore = morphLerp('barrelBore', resolveMorph(opts.morph, 'barrelBore'))
   const lenScale = morphLerp('barrelLength', resolveMorph(opts.morph, 'barrelLength'))
+  const taperMul = morphLerp('barrelTaper', resolveMorph(opts.morph, 'barrelTaper'))
   const r = dims.r * bore
+  const rFront = Math.max(0.012, r * taperMul) // 앞끝 반경 (뿔 모양)
   const l = dims.l * lenScale
 
   const group = new THREE.Group()
@@ -156,7 +203,8 @@ function buildBarrel(partId: PartId, opts: BuildOpts): BuiltPart {
   const accent: THREE.Mesh[] = []
 
   const radial = segFor(opts.lod, 14, 8)
-  const tubeGeo = new THREE.CylinderGeometry(r, r, l, radial, 1)
+  // 원기둥 top(+Y→+Z 회전 후 뒤끝)=r, bottom(앞끝)=rFront
+  const tubeGeo = new THREE.CylinderGeometry(r, rFront, l, radial, 1)
   tubeGeo.rotateX(Math.PI / 2) // 길이축 = Z (03 §1.1)
   geos.push(tubeGeo)
   const tube = new THREE.Mesh(tubeGeo, fixedMaterial(PLACEHOLDER))
@@ -165,12 +213,25 @@ function buildBarrel(partId: PartId, opts: BuildOpts): BuiltPart {
   group.add(tube)
 
   // 머즐링 (앞끝) — accent
-  const ringGeo = new THREE.TorusGeometry(r * 1.05, r * 0.28, 8, radial)
+  const ringGeo = new THREE.TorusGeometry(rFront * 1.05, rFront * 0.28, 8, radial)
   geos.push(ringGeo)
   const ring = new THREE.Mesh(ringGeo, fixedMaterial(PLACEHOLDER))
   ring.position.set(0, 0, -l)
   accent.push(ring)
   group.add(ring)
+
+  // 장식 — 나팔 끝 (켰을 때만)
+  const flareT = morphLerp('barrelFlare', resolveMorph(opts.morph, 'barrelFlare'))
+  if (flareT > 0.02) {
+    const flareLen = 0.03 + 0.06 * flareT
+    const flareGeo = new THREE.CylinderGeometry(rFront + 0.04 * flareT, rFront, flareLen, radial, 1, true)
+    flareGeo.rotateX(Math.PI / 2)
+    geos.push(flareGeo)
+    const flare = new THREE.Mesh(flareGeo, fixedMaterial(PLACEHOLDER))
+    flare.position.set(0, 0, -l - flareLen * 0.5)
+    accent.push(flare)
+    group.add(flare)
+  }
 
   // 총구 끝 앵커 (M2 총구 액세서리 승계용, 09 §3.3)
   const muzzleAnchor = new THREE.Object3D()
