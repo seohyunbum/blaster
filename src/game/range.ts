@@ -10,7 +10,7 @@ import {
 } from './ballistics.ts'
 import { fixedMaterial, paintMaterial } from './materials.ts'
 
-const POOL_SIZE = 64
+const POOL_SIZE = 128 // 미니건 6연장 버스트를 하늘에 난사해도 비행 중 탄이 안 사라지게 (64→128)
 const CONFETTI_MAX = 240
 const ASSIST_RADIUS_MUL = 1.7 // 데스크톱 어시스트 — 아이 친화로 상향 (04 §8 ①)
 const GUIDE_DOTS = 18 // 탄착 궤적 가이드 점

@@ -433,7 +433,13 @@ function randomMorphFor(arche: string): MorphState {
     if (p.archetype !== arche) continue
     // 장식은 절반 확률로만 켠다 — 늘 만땅이면 다양성이 오히려 죽는다
     if (p.group === 'deco' && Math.random() < 0.5) continue
-    m[p.key] = 0.1 + Math.random() * 0.8
+    if (p.discrete) {
+      // 정수 스텝 전역([0,1] 양끝 포함)에서 뽑기 — 미니건(6) 등 극단값도 나오게
+      const steps = Math.max(1, p.max - p.min)
+      m[p.key] = Math.round(Math.random() * steps) / steps
+    } else {
+      m[p.key] = 0.1 + Math.random() * 0.8
+    }
   }
   return m
 }

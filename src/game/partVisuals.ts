@@ -259,21 +259,25 @@ function buildBarrel(partId: PartId, opts: BuildOpts): BuiltPart {
 
   const radial = segFor(opts.lod, 14, 8)
   const count = barrelCountFromMorph(opts.morph)
-  const offsets = barrelLayout(count, r)
+  // 앞끝이 넓은 뿔 배럴에서도 총열이 안 겹치도록 앞끝 반경 기준으로 간격 산정
+  const offsets = barrelLayout(count, Math.max(r, rFront))
 
   // 총열 count 개 (지오메트리 공유) — 더블배럴·미니건
   const tubeGeo = new THREE.CylinderGeometry(r, rFront, l, radial, 1)
   tubeGeo.rotateX(Math.PI / 2) // 길이축 = Z (03 §1.1)
   geos.push(tubeGeo)
-  const ringGeo = new THREE.TorusGeometry(rFront * 1.05, rFront * 0.28, 8, radial)
-  geos.push(ringGeo)
   for (const [ox, oy] of offsets) {
     const tube = new THREE.Mesh(tubeGeo, fixedMaterial(PLACEHOLDER))
     tube.position.set(ox, oy, -l / 2)
     primary.push(tube)
     group.add(tube)
+  }
+  // 머즐링 — 단일 총열일 때만 (여러 개면 링끼리 겹쳐 뭉개짐)
+  if (count === 1) {
+    const ringGeo = new THREE.TorusGeometry(rFront * 1.05, rFront * 0.28, 8, radial)
+    geos.push(ringGeo)
     const ring = new THREE.Mesh(ringGeo, fixedMaterial(PLACEHOLDER))
-    ring.position.set(ox, oy, -l)
+    ring.position.set(0, 0, -l)
     accent.push(ring)
     group.add(ring)
   }

@@ -17,10 +17,10 @@ function fill(v: number): MorphState {
 const EXTREMES: MorphState[] = [{}, fill(0), fill(1), fill(0.5)]
 
 // 몸통 최대: 기본 5(셸·핸들·가드·코·캡) + 장식 7(날개2·볏1·꼬리2·안테나2) = 12
-// 배럴 최대: 튜브·머즐링 + 나팔 + 마디고리 5 = 8
+// 배럴 최대: 미니건 6총열 = 튜브6+허브1 = 7 / 단일 = 튜브1·링1·나팔1·마디고리5 = 8
 const MESH_BUDGET = 14
 
-test('메시 수 ≤ 10 — 극단 morph(장식 포함) (verify 게이트 §8-1)', () => {
+test('메시 수 예산(≤14) 준수 — 전 카탈로그 × 극단 morph(장식·미니건 포함)', () => {
   for (const id of M1_PARTS) {
     for (const morph of EXTREMES) {
       const built = buildPart(id, { morph })
