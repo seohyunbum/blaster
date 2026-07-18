@@ -641,25 +641,28 @@ function buildMagazine(partId: PartId, opts: BuildOpts): BuiltPart {
   const ln = morphLerp('magLength', resolveMorph(opts.morph, 'magLength'))
 
   if (partId === 'mag_drum') {
-    // 드럼통 — 옆으로 누운 꽉 찬 원반(축=X). 목으로 몸통에 연결
+    // 드럼통 — 옆으로 누운 꽉 찬 원반(축=X). 목으로 몸통에 연결.
+    // 드럼은 총구 쪽(앞=-Z)으로 조금 당겨 실제 드럼탄창처럼 배럴 밑에 오게 한다.
     const R = 0.058 * sz * (0.85 + 0.3 * ln)
+    const zFwd = -0.05 * sz // 앞으로 이동량
     const drumGeo = new THREE.CylinderGeometry(R, R, 0.05 * sz, seg)
     drumGeo.rotateZ(Math.PI / 2)
     geos.push(drumGeo)
     const drum = new THREE.Mesh(drumGeo, fixedMaterial(PLACEHOLDER))
-    drum.position.set(0, -R - 0.012, 0)
+    drum.position.set(0, -R - 0.012, zFwd)
     primary.push(drum)
     group.add(drum)
     const hubGeo = new THREE.CylinderGeometry(R * 0.3, R * 0.3, 0.056 * sz, seg)
     hubGeo.rotateZ(Math.PI / 2)
     geos.push(hubGeo)
     const hub = new THREE.Mesh(hubGeo, fixedMaterial(0xffd15c)) // 고정색(비색칠)
-    hub.position.set(0, -R - 0.012, 0)
+    hub.position.set(0, -R - 0.012, zFwd)
     group.add(hub)
-    const neckGeo = new THREE.BoxGeometry(0.03 * sz, 0.028, 0.05 * sz)
+    // 급탄 목 — 몸통(z≈0)과 앞으로 간 드럼을 잇도록 중앙 배치 + 길이 확장
+    const neckGeo = new THREE.BoxGeometry(0.03 * sz, 0.028, 0.05 * sz + Math.abs(zFwd))
     geos.push(neckGeo)
     const neck = new THREE.Mesh(neckGeo, fixedMaterial(PLACEHOLDER))
-    neck.position.set(0, -0.012, 0)
+    neck.position.set(0, -0.012, zFwd * 0.5)
     secondary.push(neck)
     group.add(neck)
   } else {
