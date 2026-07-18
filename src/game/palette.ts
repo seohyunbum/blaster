@@ -24,10 +24,10 @@ export const TOY_PALETTE = {
   toySilver: 0xc9d2dd,
   toyGold: 0xf2c14e,
   toyCopper: 0xd98757,
-  // 중립·다크 (secondary/accent 전용 — primary 존 사용 금지)
+  // 중립·다크
   toyGrayLight: 0xd9dde3,
-  toyGrayDark: 0x6b7280,
-  toyBlack: 0x2b2f36, // 검정 줄무늬·타이어 그립용. 몸통 베이스 불가
+  toyGrayDark: 0x6b7280, // 어두운 회색 — secondary/accent 전용(칙칙한 회색 몸통 방지)
+  toyBlack: 0x1e2126, // 검정 — 줄무늬·타이어 그립 + 몸통 본체색 허용(사용자 요청 2026-07-18)
 } as const
 
 export type PaletteKey = keyof typeof TOY_PALETTE
@@ -42,6 +42,14 @@ export const DARK_KEYS: ReadonlySet<PaletteKey> = new Set<PaletteKey>([
 
 export function isBright(key: PaletteKey): boolean {
   return !DARK_KEYS.has(key)
+}
+
+/**
+ * 본체색(primary 존)에 쓸 수 있는 색 — 밝은 색 전부 + 검정(사용자 요청).
+ * 어두운 회색(toyGrayDark)은 계속 secondary/accent 전용(칙칙한 몸통 방지).
+ */
+export function canBePrimary(key: PaletteKey): boolean {
+  return isBright(key) || key === 'toyBlack'
 }
 
 /** 존별 폴백 기본키 (08 §1.2) — 삭제·개명된 키의 무소음 대체. */

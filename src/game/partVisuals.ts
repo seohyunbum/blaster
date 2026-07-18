@@ -9,12 +9,17 @@ import { fixedMaterial, glowMaterial } from './materials.ts'
 export interface BuildOpts {
   morph: MorphState
   lod?: 'drag' | 'full'
+  /** 미니건 손잡이(몸통 위 그립)와 자리 겹침 방지 — 몸통 캐리핸들 생략 (assembly 가 지정). */
+  hideCarryHandle?: boolean
 }
+
+/** 앵커 키 = 소켓명 + 특수 마운트(gripTop = 미니건 손잡이용 몸통 위 마운트). */
+export type AnchorId = SocketId | 'gripTop'
 
 export interface BuiltPart {
   group: THREE.Group
   zones: Partial<Record<ZoneId, THREE.Mesh[]>>
-  anchors: Partial<Record<SocketId, THREE.Object3D>>
+  anchors: Partial<Record<AnchorId, THREE.Object3D>>
   dispose(): void
 }
 
@@ -107,13 +112,15 @@ function buildBody(partId: PartId, opts: BuildOpts): BuiltPart {
   primary.push(shell)
   group.add(shell)
 
-  // 캐리핸들 (위) — secondary
-  const handleGeo = new RoundedBoxGeometry(w * 0.5, h * 0.18, d * 0.42, 2, 0.02)
-  geos.push(handleGeo)
-  const handle = new THREE.Mesh(handleGeo, fixedMaterial(PLACEHOLDER))
-  handle.position.set(0, h * 0.5 + h * 0.06, -d * 0.05)
-  secondary.push(handle)
-  group.add(handle)
+  // 캐리핸들 (위) — secondary. 미니건 손잡이 장착 시엔 자리가 겹쳐 생략(관통 방지).
+  if (!opts.hideCarryHandle) {
+    const handleGeo = new RoundedBoxGeometry(w * 0.5, h * 0.18, d * 0.42, 2, 0.02)
+    geos.push(handleGeo)
+    const handle = new THREE.Mesh(handleGeo, fixedMaterial(PLACEHOLDER))
+    handle.position.set(0, h * 0.5 + h * 0.06, -d * 0.05)
+    secondary.push(handle)
+    group.add(handle)
+  }
 
   // 방아쇠울 (아래 앞) — accent
   const guardSeg = segFor(opts.lod, 16, 10)
@@ -230,6 +237,10 @@ function buildBody(partId: PartId, opts: BuildOpts): BuiltPart {
   const magAnchor = new THREE.Object3D()
   magAnchor.position.set(0, -h * 0.44, -d * 0.02)
   group.add(magAnchor)
+  // 미니건 손잡이용 — 몸통 위 뒤쪽 마운트(조준기·스코프 등 앞 파츠를 피해 후방-상단). 그 그립만 이 앵커로 라우팅
+  const gripTopAnchor = new THREE.Object3D()
+  gripTopAnchor.position.set(0, h * 0.5, d * 0.19)
+  group.add(gripTopAnchor)
 
   return {
     group,
@@ -241,6 +252,7 @@ function buildBody(partId: PartId, opts: BuildOpts): BuiltPart {
       stock: stockAnchor,
       muzzle: muzzleAnchor,
       magazine: magAnchor,
+      gripTop: gripTopAnchor,
     },
     dispose: () => geos.forEach((g) => g.dispose()),
   }
@@ -429,6 +441,50 @@ function buildGrip(partId: PartId, opts: BuildOpts): BuiltPart {
   const gLen = morphLerp('gripLength', resolveMorph(opts.morph, 'gripLength'))
   const gThick = morphLerp('gripThick', resolveMorph(opts.morph, 'gripThick'))
   const gAng = morphLerp('gripAngle', resolveMorph(opts.morph, 'gripAngle'))
+
+  // ── 미니건 손잡이 — 몸통 위(gripTop 앵커)에 얹히는 스페이드형 톱 핸들 ──
+  // 수직 기둥 2 + 가로 그립 바 + 그립링. +Y 로 자라 몸통 위로 솟는다(아래 그립과 반대).
+  if (partId === 'grip_minigun') {
+    // 몸통 안으로 깊게 파묻어(0.04) 곡면 몸통·기울기 극단에서도 뜨지 않게(공중부양 방지)
+    const embed = 0.04
+    const barY = 0.06 + 0.05 * gLen // 그립 바 높이(몸통 윗면 기준)
+    const span = 0.035 + 0.02 * gLen // 앞뒤 반경(핸들 길이) — 뒤로 뻗어도 곡면서 안 뜨게 상한
+    const postR = 0.009 * gThick
+    const barR = 0.013 * gThick
+    group.rotation.x = (gAng - 0.4) * 0.5 // 기본 0 근처, 기울기 슬라이더로 앞뒤로
+
+    const postGeo = new THREE.CylinderGeometry(postR, postR * 1.15, barY + embed, seg)
+    geos.push(postGeo)
+    for (const pz of [-span, span]) {
+      const post = new THREE.Mesh(postGeo, fixedMaterial(PLACEHOLDER))
+      post.position.set(0, (barY - embed) / 2, pz)
+      primary.push(post)
+      group.add(post)
+    }
+    const barGeo = new THREE.CylinderGeometry(barR, barR, span * 2 + barR * 2, seg)
+    barGeo.rotateX(Math.PI / 2) // 길이축 = Z
+    geos.push(barGeo)
+    const bar = new THREE.Mesh(barGeo, fixedMaterial(PLACEHOLDER))
+    bar.position.set(0, barY, 0)
+    primary.push(bar)
+    group.add(bar)
+    // 그립 링 — 바가 Z축이라 토러스는 회전 없이(기본 XY평면=구멍축 Z) 바를 감싼다
+    for (let i = 0; i < 2; i++) {
+      const ringGeo = new THREE.TorusGeometry(barR * 1.35, barR * 0.34, 6, seg)
+      geos.push(ringGeo)
+      const ring = new THREE.Mesh(ringGeo, fixedMaterial(PLACEHOLDER))
+      ring.position.set(0, barY, (i === 0 ? -1 : 1) * span * 0.5)
+      accent.push(ring)
+      group.add(ring)
+    }
+    return {
+      group,
+      zones: { primary, accent },
+      anchors: {},
+      dispose: () => geos.forEach((geo) => geo.dispose()),
+    }
+  }
+
   const gr = (banana ? 0.026 : 0.024) * gThick
 
   const gripGeo = new THREE.CapsuleGeometry(gr, 0.09 * gLen, 3, seg)

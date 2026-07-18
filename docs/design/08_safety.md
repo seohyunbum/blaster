@@ -50,10 +50,10 @@ export const TOY_PALETTE = {
   pastelMint:    0xa8e6cf,
   pastelSky:     0xbde0fe,
   pastelCream:   0xfff3d6,
-  // 중립·다크 (secondary/accent 전용 — primary 존 사용 금지)
+  // 중립·다크
   toyGrayLight:  0xd9dde3,
-  toyGrayDark:   0x6b7280,
-  toyBlack:      0x2b2f36,  // 검정 줄무늬·번개·타이어 그립용. 몸통 베이스 불가
+  toyGrayDark:   0x6b7280,  // 어두운 회색 — secondary/accent 전용(칙칙한 몸통 방지)
+  toyBlack:      0x1e2126,  // 검정 — 줄무늬·번개·타이어 그립 + 몸통 본체색 허용(2026-07-18 사용자 요청, canBePrimary)
 } as const;
 
 export type PaletteKey = keyof typeof TOY_PALETTE;
@@ -62,7 +62,7 @@ export type PaletteKey = keyof typeof TOY_PALETTE;
 // tip 은 고정색이라 세이브 대상이 아니다. "실총처럼 보이는 어두운 단색 몸통"만 차단하고 표현 폭은 유지.
 export type PaintZone = "primary" | "secondary" | "accent";
 export const ZONE_ALLOWED: Record<PaintZone | "tip", "bright" | "any" | "orangeOnly"> = {
-  primary: "bright",    // 원색+파스텔만. toyGray*·toyBlack 선택 불가 (결정문 25 — 밝은 색 강제)
+  primary: "bright",    // 밝은 색 + 검정(toyBlack) 허용. toyGrayDark 만 불가 (2026-07-18 canBePrimary — 사용자 요청으로 검정 예외)
   secondary: "any",
   accent: "any",        // 검정 번개 무늬·다크+네온 조합 가능
   tip: "orangeOnly",    // blasterOrange 고정 — 변경 UI 자체가 없음

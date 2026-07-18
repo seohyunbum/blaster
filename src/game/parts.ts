@@ -234,6 +234,13 @@ export const PARTS: readonly PartDef[] = [
     desc: '두툼해서 꽉 잡히는 손잡이',
     delta: { accuracy: 1, weight: 1 },
   },
+  {
+    id: 'grip_minigun',
+    slot: 'grip',
+    nameKo: '미니건 손잡이',
+    desc: '총 몸통 위에 얹는 커다란 스페이드 손잡이. 두 손으로 꽉!',
+    delta: { accuracy: 1, weight: 1 },
+  },
   // 스톡 4종
   {
     id: 'stock_pad',

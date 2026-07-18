@@ -1,6 +1,6 @@
 // src/ui/paintPanel.ts — 꾸미기 패널: 파츠·존 선택 + 팔레트 색칠 + 프리셋 (leaf).
 import type { Blaster, Finish, SlotType, ZoneId } from '../game/types.ts'
-import { ALL_PALETTE_KEYS, isBright, TOY_PALETTE, type PaletteKey } from '../game/palette.ts'
+import { ALL_PALETTE_KEYS, canBePrimary, TOY_PALETTE, type PaletteKey } from '../game/palette.ts'
 import { paintableZones } from '../game/assembly.ts'
 import { PRESETS } from '../game/presets.ts'
 
@@ -122,8 +122,8 @@ export function createPaintPanel(root: HTMLElement, cb: PaintCallbacks) {
     swatches.innerHTML = ''
     if (!blaster) return
     const cur = blaster.parts[activeSlot]?.paint[activeZone]?.color
-    // primary 존 = 밝은 색만 (08 슬롯 차등)
-    const keys = ALL_PALETTE_KEYS.filter((k) => (activeZone === 'primary' ? isBright(k) : true))
+    // 본체색(primary) = 밝은 색 + 검정 / 보조·포인트 = 전 색
+    const keys = ALL_PALETTE_KEYS.filter((k) => (activeZone === 'primary' ? canBePrimary(k) : true))
     for (const k of keys) {
       const b = document.createElement('button')
       b.className = 'swatch' + (k === cur ? ' active' : '')

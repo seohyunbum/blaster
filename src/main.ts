@@ -6,7 +6,7 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js'
 import type { Blaster, MorphKey, MorphState, PartPaint, SlotType } from './game/types.ts'
 import { computeStats, partsForSlot } from './game/parts.ts'
 import { boreScaleFromMorph, archetypeForSlot, barrelCountFromMorph } from './game/morph.ts'
-import { ALL_PALETTE_KEYS, isBright } from './game/palette.ts'
+import { ALL_PALETTE_KEYS, canBePrimary } from './game/palette.ts'
 import {
   toShotProfile,
   PROJECTILE_GRAVITY,
@@ -466,9 +466,9 @@ function pick<T>(arr: readonly T[]): T {
 function randomizeAll(): void {
   morphGesture = null
   pushUndo()
-  const brightKeys = ALL_PALETTE_KEYS.filter(isBright)
+  const primaryKeys = ALL_PALETTE_KEYS.filter(canBePrimary)
   const randomPaint = (): PartPaint => ({
-    primary: { color: pick(brightKeys), finish: pick(FINISHES) },
+    primary: { color: pick(primaryKeys), finish: pick(FINISHES) },
     secondary: { color: pick(ALL_PALETTE_KEYS), finish: pick(FINISHES) },
     accent: { color: pick(ALL_PALETTE_KEYS), finish: pick(FINISHES) },
   })

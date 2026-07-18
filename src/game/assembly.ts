@@ -58,15 +58,22 @@ export function buildBlaster(
   if (!bodyInst) {
     return { group, parts, dispose: () => {} }
   }
-  const bodyBuilt = buildPart(bodyInst.partId, { morph: bodyInst.morph, lod })
+  // 미니건 손잡이는 몸통 위에 얹히므로 몸통 캐리핸들과 자리가 겹친다 → 캐리핸들 생략(관통 방지)
+  const hideCarryHandle = blaster.parts.grip?.partId === 'grip_minigun'
+  const bodyBuilt = buildPart(bodyInst.partId, { morph: bodyInst.morph, lod, hideCarryHandle })
   applyPaint(bodyBuilt, bodyInst.paint)
   parts.body = bodyBuilt
   group.add(bodyBuilt.group)
 
   for (const slot of ATTACH_SLOTS) {
     const inst = blaster.parts[slot]
-    const anchor = bodyBuilt.anchors[slot]
-    if (!inst || !anchor) continue
+    if (!inst) continue
+    // 미니건 손잡이는 몸통 위(gripTop) 마운트로, 그 외 그립·파츠는 기본 소켓으로
+    const anchor =
+      slot === 'grip' && inst.partId === 'grip_minigun'
+        ? (bodyBuilt.anchors.gripTop ?? bodyBuilt.anchors.grip)
+        : bodyBuilt.anchors[slot]
+    if (!anchor) continue
     parts[slot] = attachTo(anchor, inst, lod)
   }
 

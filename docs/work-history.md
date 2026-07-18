@@ -110,3 +110,30 @@
 - **UI**: 공방 탭 "다트 팩"(용량 표기 카드)·색칠 탭 편입. paintPanel/workshopPanel.
 - **세이브**: magazine 슬롯·magSize/magLength morph 가 normalizeSave 라운드트립 보존(테스트). 기존 총 무손상.
 - **검증**: 헤드리스 __blasterLab — drum 24발 소진→자동재장전→2.5초 후 완료, 미니건 6소비, 부분탄(count4·6발→4→2), 무한모드 20발 불변, R 수동재장전, 콘솔 에러 0. 실 UI 클릭으로 탭·카드·장착 동작 확인. 58테스트(다트팩 4 신설)·typecheck·build.
+
+## 2026-07-18 — 검정 본체색 허용 + 미니건 손잡이(몸통 위 그립)
+
+사용자 요청 2건.
+
+**A. 검정을 본체색(primary)에 허용** — 기존 규칙(08 §1.2 "primary=밝은 색만")에서 검정만 예외.
+- `palette.ts`: `canBePrimary(key)=isBright(key)||key==='toyBlack'` 신설. toyGrayDark 는 계속 primary 불가(칙칙한 회색 몸통 방지). toyBlack 0x2b2f36→**0x1e2126**(확실히 검정으로 읽히게). paintPanel 스와치 필터·main.ts 랜덤 primary 가 canBePrimary 사용.
+- 검증: 본체색 스와치 21종(검정 포함·회색 제외), 몸통 실제 색칠 toyBlack 적용, 에러 0.
+
+**B. 미니건 손잡이(grip_minigun)** — 그립 슬롯 신규, "총 몸통 위" 장착.
+- `partVisuals.ts`: buildBody 에 `gripTopAnchor(0,h*0.5,d*0.06)` 신설, `BuiltPart.anchors` 타입을 `AnchorId=SocketId|'gripTop'` 로 확장. buildGrip 의 grip_minigun 분기 = +Y로 솟는 스페이드 핸들(수직기둥2+가로바+그립링2=5메시), gripLength/Thick/Angle morph 재사용.
+- `assembly.ts`: grip_minigun 만 `anchors.gripTop`(없으면 grip 폴백)로 라우팅, 그 외 그립은 하단 유지.
+- `parts.ts`: grip_minigun(미니건 손잡이, delta accuracy+1/weight+1). vocab 통과('minigun'≠'gun' 토큰).
+- 검증: 4개 몸통(불도그/오브/로켓/타이탄)에서 몸통 위로 +0.10 솟고 float 간극 음수(부유 0), 5메시. 실 UI 장착 확인, 에러 0.
+
+- 세이브: grip_minigun 슬롯·그립 morph·primary=toyBlack 라운드트립 보존(추가만이라 기존 총 무영향).
+- 테스트 62(palette 2·미니건 손잡이 2 신설)·typecheck·build. 결정 로그 = 00_DECISIONS 스코프 변경.
+
+### 적대적 QA (Workflow fan-out 5관점×검증) — 확정 12건 처리
+- **[high] 미니건 손잡이 앞기둥이 몸통 캐리핸들 관통** (기본 morph·전 몸통 상시): assembly 가 grip_minigun 장착 시 `hideCarryHandle` 로 캐리핸들 생략(BuildOpts 신규 플래그) → 두 손잡이 자리다툼 제거. 검증: 조립 시 몸통 자체 메시 4(vs 일반그립 5).
+- **[med] 앵커 위치 재조정**: gripTop 을 d*0.06→**d*0.19**(후방-상단 스페이드 위치)로 이동해 조준기·스코프 앞 파츠 회피. 기본 스코프까지 Z-클리어(그립앞 0.022>스코프뒤 0.019). 최대크기 스코프+미니건그립만 미세 그레이즈(극단 조합, 잔존).
+- **[low] 곡면 몸통·기울기 극단 부유**: embed 0.02→**0.04** + span 상한 축소(0.035+0.02·gLen) → 6몸통×3극단 morph 최소 여유 0.061(어디서도 안 뜸).
+- **[low] 그립 링 축 오정렬**: 바가 Z축이라 토러스 `rotation.y` 제거(무회전=구멍축 Z 로 바를 감쌈, 마디고리/머즐링과 동일 규약).
+- **[low] 문서 불일치**: 08_safety.md toyBlack 0x2b2f36·"몸통 베이스 불가" → 0x1e2126·canBePrimary 허용으로 동기화.
+- **[low/med] 테스트 보강**: palette 배선 테스트(스와치·랜덤 후보에 검정 포함/회색 제외), 미러 테스트 탈-동어반복, 캐리핸들 생략 테스트 2건, 메시예산 EXTREMES 에 단일배럴+장식만땅 케이스 추가.
+- **[정책 유지] '미니건' 명칭**: 금칙어 사전에 없고(탄창과 달리), 이미 barrelCount 라벨로 쓰이는 프로젝트 확립 용어이자 일반 완구/만화 표현이라 사용자 요청대로 유지(글록/M4 같은 특정 브랜드·모델명과 구분). 차단 시 기존 사용·사용자 요청과 충돌.
+- 최종: 64테스트·typecheck·build·헤드리스(관통0·부유0·에러0).
