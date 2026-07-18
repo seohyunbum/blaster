@@ -4,10 +4,25 @@
 import type { MorphKey, MorphState, StatDelta } from './types.ts'
 
 /** 변형 가능한 파츠 원형 = 슬롯명과 동일 (전 슬롯이 주무를 수 있다). */
-export type MorphArchetype = 'body' | 'barrel' | 'sight' | 'grip' | 'stock' | 'muzzle'
+export type MorphArchetype =
+  | 'body'
+  | 'barrel'
+  | 'sight'
+  | 'grip'
+  | 'stock'
+  | 'muzzle'
+  | 'magazine'
 export type MorphGroup = 'shape' | 'deco'
 
-const ARCHETYPES: readonly string[] = ['body', 'barrel', 'sight', 'grip', 'stock', 'muzzle']
+const ARCHETYPES: readonly string[] = [
+  'body',
+  'barrel',
+  'sight',
+  'grip',
+  'stock',
+  'muzzle',
+  'magazine',
+]
 
 /** 슬롯명 → 원형. 변형 불가 슬롯이면 null. */
 export function archetypeForSlot(slot: string): MorphArchetype | null {
@@ -338,6 +353,33 @@ export const MORPH_PARAMS: readonly MorphParamDef[] = [
     maxLabelKo: '길게',
     min: 0.5,
     max: 1.8,
+    defaultT: 0.5,
+    deltaAt0: {},
+    deltaAt1: {},
+  },
+  // ── 탄창 · 모양 (용량·재장전은 파츠 고정, 여기선 겉모습만) ──
+  {
+    key: 'magSize',
+    archetype: 'magazine',
+    group: 'shape',
+    labelKo: '크기',
+    minLabelKo: '작게',
+    maxLabelKo: '크게',
+    min: 0.7,
+    max: 1.6,
+    defaultT: 0.5,
+    deltaAt0: { weight: -0.5 },
+    deltaAt1: { weight: 0.5 },
+  },
+  {
+    key: 'magLength',
+    archetype: 'magazine',
+    group: 'shape',
+    labelKo: '길이',
+    minLabelKo: '짧게',
+    maxLabelKo: '길쭉하게',
+    min: 0.6,
+    max: 1.7,
     defaultT: 0.5,
     deltaAt0: {},
     deltaAt1: {},

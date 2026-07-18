@@ -29,7 +29,7 @@ export interface BuiltBlaster {
 }
 
 // 몸통 소켓에 직접 부착하는 슬롯 (머즐은 배럴 끝 승계라 별도 처리)
-const ATTACH_SLOTS: SlotType[] = ['barrel', 'sight', 'grip', 'stock']
+const ATTACH_SLOTS: SlotType[] = ['barrel', 'sight', 'grip', 'stock', 'magazine']
 
 function attachTo(
   anchor: THREE.Object3D,

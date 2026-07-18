@@ -92,3 +92,34 @@ test('validateBlaster: body 없으면 문제, 정상은 빈 배열', () => {
   const noBody: Blaster = { id: 't', name: 't', createdAt: 0, parts: {} }
   assert.ok(validateBlaster(noBody).length > 0)
 })
+
+test('다트 팩 없으면 용량 0(무한), 달면 그 파츠의 용량·재장전 반영', () => {
+  const none = computeStats(bare('body_bulldog'))
+  assert.equal(none.capacity, 0) // 0 = 무한(사격장이 무한으로 해석)
+  assert.equal(none.reloadSec, 0)
+
+  const withMag: Blaster = {
+    id: 't',
+    name: 't',
+    createdAt: 0,
+    parts: {
+      body: makeInstance('body_bulldog'),
+      magazine: makeInstance('mag_drum'), // 24발 / 2.5초
+    },
+  }
+  const s = computeStats(withMag)
+  assert.equal(s.capacity, 24)
+  assert.equal(s.reloadSec, 2.5)
+})
+
+test('다트 팩도 무게에 반영된다 (미니 클립 +0 < 젤리 탱크 +2)', () => {
+  const light = computeStats({
+    ...bare('body_titan'),
+    parts: { body: makeInstance('body_titan'), magazine: makeInstance('mag_mini') }, // W+0
+  })
+  const heavy = computeStats({
+    ...bare('body_titan'),
+    parts: { body: makeInstance('body_titan'), magazine: makeInstance('mag_jelly') }, // W+2
+  })
+  assert.ok(heavy.weight > light.weight)
+})

@@ -23,6 +23,7 @@ export interface WorkshopCallbacks {
 const SLOT_TABS: { slot: SlotType; label: string }[] = [
   { slot: 'body', label: '몸통' },
   { slot: 'barrel', label: '배럴' },
+  { slot: 'magazine', label: '다트 팩' },
   { slot: 'sight', label: '조준기' },
   { slot: 'grip', label: '그립' },
   { slot: 'stock', label: '스톡' },
@@ -107,11 +108,15 @@ export function createWorkshopPanel(root: HTMLElement, cb: WorkshopCallbacks) {
     const current = blaster.parts[activeSlot]?.partId ?? null
     const options = partsForSlot(activeSlot)
     if (activeSlot !== 'body') {
-      parts.appendChild(partCard('없음', current === null, () => cb.onSelectPart(activeSlot, null)))
+      const noneLabel = activeSlot === 'magazine' ? '없음 (다트 무한)' : '없음'
+      parts.appendChild(partCard(noneLabel, current === null, () => cb.onSelectPart(activeSlot, null)))
     }
     for (const def of options) {
+      // 탄창 카드엔 용량을 함께 보여 골라 담기 쉽게
+      const label =
+        activeSlot === 'magazine' && def.capacity ? `${def.nameKo} · ${def.capacity}발` : def.nameKo
       parts.appendChild(
-        partCard(def.nameKo, current === def.id, () => cb.onSelectPart(activeSlot, def.id)),
+        partCard(label, current === def.id, () => cb.onSelectPart(activeSlot, def.id)),
       )
     }
   }

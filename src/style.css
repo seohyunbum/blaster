@@ -817,6 +817,62 @@ body {
   border-color: var(--accent);
 }
 
+/* ── 탄약 계기 (우하단, 조준경 위) ── */
+.ammo-counter {
+  position: absolute;
+  right: 18px;
+  bottom: 74px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 3px;
+  pointer-events: none;
+  background: rgba(255, 255, 255, 0.9);
+  border-radius: 14px;
+  padding: 7px 13px;
+  box-shadow: var(--shadow);
+}
+.ammo-num {
+  font-weight: 900;
+  font-size: 20px;
+  color: var(--ink);
+  line-height: 1;
+}
+.ammo-num.empty {
+  color: #e0485b;
+}
+.ammo-dots {
+  font-size: 11px;
+  letter-spacing: 1px;
+  line-height: 1;
+}
+.ammo-inf {
+  font-weight: 900;
+  font-size: 18px;
+  color: var(--ink);
+}
+.ammo-reload {
+  font-weight: 900;
+  font-size: 16px;
+  color: #f08a2c;
+}
+.ammo-bar {
+  display: block;
+  width: 92px;
+  height: 7px;
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.12);
+  overflow: hidden;
+}
+.ammo-bar-fill {
+  display: block;
+  height: 100%;
+  width: 0%;
+  border-radius: 999px;
+  background: #f5a623;
+  transition: width 0.08s linear;
+}
+
 .result-overlay {
   position: absolute;
   inset: 0;

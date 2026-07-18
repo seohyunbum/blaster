@@ -80,21 +80,73 @@ export function createRangeHud(root: HTMLElement, cb: RangeHudCallbacks) {
   addChip('reddot', '레드도트', 'reddot-chip')
   for (const m of MAG_OPTIONS) addChip(m, `${m}배`)
 
+  // 탄약 계기 — 우하단(조준경 위). 탄창 있을 때만 표시, 없으면 무한
+  const ammoEl = document.createElement('div')
+  ammoEl.className = 'ammo-counter'
+  root.appendChild(ammoEl)
+
   const result = document.createElement('div')
   result.className = 'result-overlay hidden'
   root.appendChild(result)
 
   let hits = 0
+  let ammoCur = 0
+  let ammoMax = 0
+  let reloading = false
 
   function renderHits(): void {
     hitsEl.textContent = `맞힌 개수: ${hits}`
   }
   renderHits()
 
+  function renderAmmo(): void {
+    if (ammoMax <= 0) {
+      // 다트 팩 없음 = 무한 (지금까지와 동일)
+      ammoEl.innerHTML = '<span class="ammo-inf">다트 ∞</span>'
+      return
+    }
+    if (reloading) {
+      ammoEl.innerHTML =
+        '<span class="ammo-reload">재장전 중…</span>' +
+        '<span class="ammo-bar"><span class="ammo-bar-fill"></span></span>'
+      return
+    }
+    // 12발 이하면 점으로, 많으면 숫자만 (드럼·젤리 탱크)
+    const dots =
+      ammoMax <= 12
+        ? '🔵'.repeat(ammoCur) + '⚪'.repeat(Math.max(0, ammoMax - ammoCur))
+        : ''
+    ammoEl.innerHTML =
+      `<span class="ammo-num${ammoCur <= 0 ? ' empty' : ''}">${ammoCur} / ${ammoMax}</span>` +
+      (dots ? `<span class="ammo-dots">${dots}</span>` : '')
+  }
+  renderAmmo()
+
   return {
     setHits(n: number): void {
       hits = n
       renderHits()
+    },
+    /** 탄약 계기 갱신. max<=0 이면 무한(탄창 없음). reloadFrac 0..1 이면 재장전 진행. */
+    setAmmo(current: number, max: number, isReloading: boolean, reloadFrac = 0): void {
+      const wasReloading = reloading
+      ammoCur = current
+      ammoMax = max
+      reloading = isReloading
+      const fillPct = `${Math.round(Math.max(0, Math.min(1, reloadFrac)) * 100)}%`
+      // 재장전 진행 중엔 DOM 재생성 없이 진행바만 갱신 (프레임당 호출 최적화)
+      if (isReloading && wasReloading) {
+        const fill = ammoEl.querySelector<HTMLElement>('.ammo-bar-fill')
+        if (fill) {
+          fill.style.width = fillPct
+          return
+        }
+      }
+      renderAmmo()
+      if (isReloading) {
+        const fill = ammoEl.querySelector<HTMLElement>('.ammo-bar-fill')
+        if (fill) fill.style.width = fillPct
+      }
     },
     /** 조준 링 크기를 퍼짐각에 비례 (04 §4.1-3). */
     setSpread(spreadDeg: number): void {

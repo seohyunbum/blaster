@@ -20,7 +20,7 @@ export const BODIES: readonly BodyDef[] = [
     delta: {},
     base: { power: 3, fireRate: 6, accuracy: 4, weight: 2 },
     weightLimit: 6,
-    sockets: ['barrel', 'sight', 'grip', 'stock', 'muzzle'],
+    sockets: ['barrel', 'sight', 'grip', 'stock', 'muzzle', 'magazine'],
   },
   {
     id: 'body_bulldog',
@@ -30,7 +30,7 @@ export const BODIES: readonly BodyDef[] = [
     delta: {},
     base: { power: 5, fireRate: 4, accuracy: 5, weight: 4 },
     weightLimit: 9,
-    sockets: ['barrel', 'sight', 'grip', 'stock', 'muzzle'],
+    sockets: ['barrel', 'sight', 'grip', 'stock', 'muzzle', 'magazine'],
   },
   {
     id: 'body_titan',
@@ -40,7 +40,7 @@ export const BODIES: readonly BodyDef[] = [
     delta: {},
     base: { power: 7, fireRate: 2, accuracy: 6, weight: 6 },
     weightLimit: 12,
-    sockets: ['barrel', 'sight', 'grip', 'stock', 'muzzle'],
+    sockets: ['barrel', 'sight', 'grip', 'stock', 'muzzle', 'magazine'],
   },
   {
     id: 'body_jelly',
@@ -50,7 +50,7 @@ export const BODIES: readonly BodyDef[] = [
     delta: {},
     base: { power: 4, fireRate: 5, accuracy: 3, weight: 3 },
     weightLimit: 8,
-    sockets: ['barrel', 'sight', 'grip', 'stock', 'muzzle'],
+    sockets: ['barrel', 'sight', 'grip', 'stock', 'muzzle', 'magazine'],
   },
   {
     id: 'body_rocket',
@@ -60,7 +60,7 @@ export const BODIES: readonly BodyDef[] = [
     delta: {},
     base: { power: 5, fireRate: 5, accuracy: 6, weight: 4 },
     weightLimit: 9,
-    sockets: ['barrel', 'sight', 'grip', 'stock', 'muzzle'],
+    sockets: ['barrel', 'sight', 'grip', 'stock', 'muzzle', 'magazine'],
   },
   {
     id: 'body_orb',
@@ -70,7 +70,7 @@ export const BODIES: readonly BodyDef[] = [
     delta: {},
     base: { power: 4, fireRate: 7, accuracy: 3, weight: 3 },
     weightLimit: 7,
-    sockets: ['barrel', 'sight', 'grip', 'stock', 'muzzle'],
+    sockets: ['barrel', 'sight', 'grip', 'stock', 'muzzle', 'magazine'],
   },
   {
     id: 'body_wedge',
@@ -80,7 +80,7 @@ export const BODIES: readonly BodyDef[] = [
     delta: {},
     base: { power: 4, fireRate: 7, accuracy: 5, weight: 3 },
     weightLimit: 7,
-    sockets: ['barrel', 'sight', 'grip', 'stock', 'muzzle'],
+    sockets: ['barrel', 'sight', 'grip', 'stock', 'muzzle', 'magazine'],
   },
   {
     id: 'body_chunk',
@@ -90,7 +90,7 @@ export const BODIES: readonly BodyDef[] = [
     delta: {},
     base: { power: 6, fireRate: 3, accuracy: 5, weight: 5 },
     weightLimit: 11,
-    sockets: ['barrel', 'sight', 'grip', 'stock', 'muzzle'],
+    sockets: ['barrel', 'sight', 'grip', 'stock', 'muzzle', 'magazine'],
   },
 ]
 
@@ -145,6 +145,43 @@ export const PARTS: readonly PartDef[] = [
     nameKo: '니들 배럴',
     desc: '아주 가늘고 긴 배럴. 콕 집어 맞혀요',
     delta: { fireRate: -1, accuracy: 4, weight: 1 },
+  },
+  // 탄창(다트 팩) 4종 — 달면 그 용량만큼 발사·재장전. 안 달면 무한(선택제)
+  {
+    id: 'mag_mini',
+    slot: 'magazine',
+    nameKo: '미니 클립',
+    desc: '6발. 눈 깜짝할 새 갈아끼우는 초경량 클립',
+    delta: {},
+    capacity: 6,
+    reloadSec: 0.5,
+  },
+  {
+    id: 'mag_spring',
+    slot: 'magazine',
+    nameKo: '스프링 팩',
+    desc: '12발. 표준 스프링 장전식',
+    delta: { weight: 1 },
+    capacity: 12,
+    reloadSec: 1.2,
+  },
+  {
+    id: 'mag_drum',
+    slot: 'magazine',
+    nameKo: '드럼통',
+    desc: '24발. 도넛 모양 대용량. 다 쏘면 긴 재장전',
+    delta: { weight: 2 },
+    capacity: 24,
+    reloadSec: 2.5,
+  },
+  {
+    id: 'mag_jelly',
+    slot: 'magazine',
+    nameKo: '젤리 탱크',
+    desc: '30발. 젤리볼이 찰랑거리는 투명 수조',
+    delta: { weight: 2 },
+    capacity: 30,
+    reloadSec: 3.2,
   },
   // 조준기 4종
   {

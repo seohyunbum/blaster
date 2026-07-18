@@ -226,6 +226,10 @@ function buildBody(partId: PartId, opts: BuildOpts): BuiltPart {
   const muzzleAnchor = new THREE.Object3D() // 배럴 없을 때 폴백
   muzzleAnchor.position.set(0, h * 0.08, -halfZ - noseLen)
   group.add(muzzleAnchor)
+  // 탄창 급탄구 — 방아쇠울 앞쪽 아래(그립보다 전방)에서 아래로 매달림
+  const magAnchor = new THREE.Object3D()
+  magAnchor.position.set(0, -h * 0.44, -d * 0.02)
+  group.add(magAnchor)
 
   return {
     group,
@@ -236,6 +240,7 @@ function buildBody(partId: PartId, opts: BuildOpts): BuiltPart {
       grip: gripAnchor,
       stock: stockAnchor,
       muzzle: muzzleAnchor,
+      magazine: magAnchor,
     },
     dispose: () => geos.forEach((g) => g.dispose()),
   }
@@ -569,6 +574,78 @@ function buildMuzzle(partId: PartId, opts: BuildOpts): BuiltPart {
   }
 }
 
+// ─── 탄창(다트 팩) — 몸통 아래 급탄구에 부착, -Y 로 매달림 ────
+function buildMagazine(partId: PartId, opts: BuildOpts): BuiltPart {
+  const group = new THREE.Group()
+  const geos: THREE.BufferGeometry[] = []
+  const primary: THREE.Mesh[] = []
+  const secondary: THREE.Mesh[] = []
+  const seg = segFor(opts.lod, 14, 8)
+  const sz = morphLerp('magSize', resolveMorph(opts.morph, 'magSize'))
+  const ln = morphLerp('magLength', resolveMorph(opts.morph, 'magLength'))
+
+  if (partId === 'mag_drum') {
+    // 드럼통 — 옆으로 누운 꽉 찬 원반(축=X). 목으로 몸통에 연결
+    const R = 0.058 * sz * (0.85 + 0.3 * ln)
+    const drumGeo = new THREE.CylinderGeometry(R, R, 0.05 * sz, seg)
+    drumGeo.rotateZ(Math.PI / 2)
+    geos.push(drumGeo)
+    const drum = new THREE.Mesh(drumGeo, fixedMaterial(PLACEHOLDER))
+    drum.position.set(0, -R - 0.012, 0)
+    primary.push(drum)
+    group.add(drum)
+    const hubGeo = new THREE.CylinderGeometry(R * 0.3, R * 0.3, 0.056 * sz, seg)
+    hubGeo.rotateZ(Math.PI / 2)
+    geos.push(hubGeo)
+    const hub = new THREE.Mesh(hubGeo, fixedMaterial(0xffd15c)) // 고정색(비색칠)
+    hub.position.set(0, -R - 0.012, 0)
+    group.add(hub)
+    const neckGeo = new THREE.BoxGeometry(0.03 * sz, 0.028, 0.05 * sz)
+    geos.push(neckGeo)
+    const neck = new THREE.Mesh(neckGeo, fixedMaterial(PLACEHOLDER))
+    neck.position.set(0, -0.012, 0)
+    secondary.push(neck)
+    group.add(neck)
+  } else {
+    // 미니 클립·스프링 팩·젤리 탱크 — 아래로 매달린 상자 (살짝 앞으로 기움)
+    const w = 0.05 * sz
+    const d = 0.07 * sz
+    const h = 0.13 * ln
+    const tilt = 0.12
+    const caseGeo = new RoundedBoxGeometry(w, h, d, 2, 0.012)
+    geos.push(caseGeo)
+    const mag = new THREE.Mesh(caseGeo, fixedMaterial(PLACEHOLDER))
+    mag.rotation.x = tilt
+    mag.position.set(0, -h * 0.5, 0)
+    primary.push(mag)
+    group.add(mag)
+    // 잔량이 보이는 옆창 — secondary
+    const winGeo = new THREE.BoxGeometry(0.012, h * 0.7, d * 0.5)
+    geos.push(winGeo)
+    const win = new THREE.Mesh(winGeo, fixedMaterial(PLACEHOLDER))
+    win.rotation.x = tilt
+    win.position.set(w * 0.5, -h * 0.5, 0)
+    secondary.push(win)
+    group.add(win)
+    // 창 안에 보이는 다트 캡슐 2개 — 고정색(비색칠)
+    const dartGeo = new THREE.CapsuleGeometry(0.01 * sz, 0.02, 3, seg)
+    geos.push(dartGeo)
+    for (let i = 0; i < 2; i++) {
+      const dart = new THREE.Mesh(dartGeo, fixedMaterial(0xff8a5c))
+      dart.rotation.x = tilt
+      dart.position.set(w * 0.5 + 0.002, -h * (0.3 + i * 0.3), 0)
+      group.add(dart)
+    }
+  }
+
+  return {
+    group,
+    zones: { primary, secondary },
+    anchors: {},
+    dispose: () => geos.forEach((g) => g.dispose()),
+  }
+}
+
 const FALLBACK_MAT = fixedMaterial(0x999999)
 
 function buildFallback(): BuiltPart {
@@ -592,6 +669,7 @@ export function buildPart(partId: PartId, opts: BuildOpts): BuiltPart {
   if (partId.startsWith('grip_')) return buildGrip(partId, opts)
   if (partId.startsWith('stock_')) return buildStock(partId, opts)
   if (partId.startsWith('muzzle_')) return buildMuzzle(partId, opts)
+  if (partId.startsWith('mag_')) return buildMagazine(partId, opts)
   return buildFallback()
 }
 

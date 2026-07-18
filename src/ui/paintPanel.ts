@@ -69,9 +69,9 @@ export function createPaintPanel(root: HTMLElement, cb: PaintCallbacks) {
 
   function slotsOfBlaster(): SlotType[] {
     if (!blaster) return []
-    return (['body', 'barrel', 'sight', 'grip', 'stock', 'muzzle'] as SlotType[]).filter(
-      (s) => blaster!.parts[s],
-    )
+    return (
+      ['body', 'barrel', 'magazine', 'sight', 'grip', 'stock', 'muzzle'] as SlotType[]
+    ).filter((s) => blaster!.parts[s])
   }
 
   function renderPartTabs(): void {
@@ -79,6 +79,7 @@ export function createPaintPanel(root: HTMLElement, cb: PaintCallbacks) {
     const names: Record<string, string> = {
       body: '몸통',
       barrel: '배럴',
+      magazine: '다트 팩',
       sight: '조준기',
       grip: '그립',
       stock: '스톡',

@@ -54,6 +54,18 @@ export const sfx = {
   },
   /** 슬라이더 드래그 — t 를 따라 피치 슬라이드 (09 §5). */
   morph: (t: number) => tone(500 + 600 * t, 0.05, 'sine', 0.05),
+  /** 재장전 시작 — 딸깍(탄창 결합) 두 톤. */
+  reload: () => {
+    tone(360, 0.05, 'square', 0.08)
+    setTimeout(() => tone(720, 0.07, 'triangle', 0.09), 70)
+  },
+  /** 재장전 완료 — 장전 완료 상승 톤. */
+  reloadDone: () => {
+    tone(680, 0.06, 'triangle', 0.09)
+    setTimeout(() => tone(1020, 0.09, 'sine', 0.1), 80)
+  },
+  /** 빈 탄창에 발사 시도 — 짧은 빈총 클릭. */
+  empty: () => tone(200, 0.05, 'square', 0.06),
   star: () => {
     tone(880, 0.12, 'sine', 0.12)
     setTimeout(() => tone(1100, 0.12, 'sine', 0.12), 90)

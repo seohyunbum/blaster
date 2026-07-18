@@ -592,6 +592,12 @@ let aimPitch = 0
 let recoilPitch = 0
 let totalHits = 0 // 풍선 + 과녁 (과녁 명중이 0 반영되던 버그 수정)
 let shotsFired = 0
+// ── 탄창(다트 팩) — 탄창 장착 시만 유한. ammoMax<=0 = 무한(탄창 없음) ──
+let ammoMax = 0
+let ammoCur = 0
+let reloading = false
+let reloadDurMs = 0
+let reloadEndT = 0
 let guideSpeed = 30
 let guideGravity = 4
 let recoilRecovery = (8 * Math.PI) / 180 // rad/s — enterRange 에서 총별로 캐시
@@ -687,6 +693,22 @@ function enterRange(): void {
   guideGravity = PROJECTILE_GRAVITY[profile.kind]
   // 설계 복귀율(8~14°/s)을 실제로 배선 — 하드코딩 126°/s 라 반동이 안 보이던 버그 수정
   recoilRecovery = (recoveryDegPerSec(profile) * Math.PI) / 180
+  // 탄창 장착 시 유한 탄약·재장전, 없으면 무한 (stats.capacity 0 = 무한)
+  ammoMax = stats.capacity
+  ammoCur = ammoMax
+  reloading = false
+  reloadDurMs = Math.max(0, stats.reloadSec) * 1000
+  reloadEndT = 0
+  rangeHud.setAmmo(ammoCur, ammoMax, false)
+}
+
+/** 재장전 시작 — 탄창 있고, 아직 안 하는 중이고, 꽉 차지 않았을 때만. */
+function startReload(): void {
+  if (ammoMax <= 0 || reloading || ammoCur >= ammoMax) return
+  reloading = true
+  reloadEndT = performance.now() + reloadDurMs
+  rangeHud.setAmmo(ammoCur, ammoMax, true, 0)
+  sfx.reload()
 }
 
 const _aimEuler = new THREE.Euler(0, 0, 0, 'YXZ')
@@ -699,30 +721,48 @@ const _fireRight = new THREE.Vector3()
 const _fireUp = new THREE.Vector3()
 const _fireDir = new THREE.Vector3()
 function fire(): void {
+  // 재장전 중엔 발사 불가
+  if (reloading) return
+  const count = barrelCountFromMorph(active.parts.barrel?.morph ?? {})
+  // 탄창 장착 시: 남은 탄만큼만 발사. 비어 있으면 재장전 시작하고 이번 발사는 건너뜀
+  let shots = count
+  if (ammoMax > 0) {
+    if (ammoCur <= 0) {
+      sfx.empty()
+      startReload()
+      return
+    }
+    shots = Math.min(count, ammoCur)
+  }
   const stats = computeStats(active)
   const bore = boreScaleFromMorph(active.parts.barrel?.morph ?? {})
   const profile = toShotProfile(stats, bore)
-  const count = barrelCountFromMorph(active.parts.barrel?.morph ?? {})
   const dir = new THREE.Vector3()
   camera.getWorldDirection(dir)
   const origin = camera.position.clone().addScaledVector(dir, 0.5)
-  // 총열 수만큼 발사 — 더블배럴 2발·미니건 6발. 좌우로 살짝 퍼뜨려 여러 개가 보이게
+  // 발사 수만큼 발사 — 더블배럴 2발·미니건 6발. 좌우로 살짝 퍼뜨려 여러 개가 보이게
   _fireRight.crossVectors(dir, camera.up).normalize()
   _fireUp.crossVectors(_fireRight, dir).normalize()
-  for (let i = 0; i < count; i++) {
-    const off = count === 1 ? 0 : (i / (count - 1) - 0.5) * 2 // -1..1
+  for (let i = 0; i < shots; i++) {
+    const off = shots === 1 ? 0 : (i / (shots - 1) - 0.5) * 2 // -1..1
     const fan = 0.03 // 퍼짐 반경(rad)
     _fireDir
       .copy(dir)
       .addScaledVector(_fireRight, off * fan)
-      .addScaledVector(_fireUp, (count > 2 ? Math.sin(i) * 0.4 : 0) * fan)
+      .addScaledVector(_fireUp, (shots > 2 ? Math.sin(i) * 0.4 : 0) * fan)
       .normalize()
     range.fireOne(profile, origin, _fireDir)
   }
   shotsFired += 1
+  // 탄약 차감 후 비면 자동 재장전
+  if (ammoMax > 0) {
+    ammoCur -= shots
+    rangeHud.setAmmo(ammoCur, ammoMax, false)
+    if (ammoCur <= 0) startReload()
+  }
   // 누적 상한 클램프 (설계 RECOIL_MAX_DEG) — 느린 복귀와 짝. 다발이면 반동 약간↑(상한 내)
   recoilPitch = Math.min(
-    recoilPitch + (profile.recoilKickDeg * Math.PI * (1 + (count - 1) * 0.15)) / 180,
+    recoilPitch + (profile.recoilKickDeg * Math.PI * (1 + (shots - 1) * 0.15)) / 180,
     RECOIL_MAX_RAD,
   )
   sfx.shoot()
@@ -746,6 +786,11 @@ function retryRange(): void {
   shotsFired = 0
   range.reset()
   rangeHud.setHits(0)
+  // 탄약도 가득 채우고 재장전 상태 해제
+  ammoCur = ammoMax
+  reloading = false
+  reloadEndT = 0
+  rangeHud.setAmmo(ammoCur, ammoMax, false)
 }
 
 function starsFor(hits: number): 0 | 1 | 2 | 3 {
@@ -820,6 +865,11 @@ renderer.domElement.addEventListener('contextmenu', (ev) => {
   ev.preventDefault()
   selectMag(aimMode === 'none' ? 'reddot' : null)
 })
+// R 키 = 수동 재장전 (다 쓰기 전에 미리 갈아끼우기)
+window.addEventListener('keydown', (ev) => {
+  if (station !== 'range') return
+  if (ev.key === 'r' || ev.key === 'R') startReload()
+})
 
 // ─── 루프 ──────────────────────────────────────────────────
 let lastT = performance.now()
@@ -834,6 +884,18 @@ function tick(): void {
       // 설계 복귀율(8~14°/s) — 하드코딩 2.2rad/s(=126°/s)는 킥을 렌더 전에 지워버렸다
       recoilPitch = Math.max(0, recoilPitch - dt * recoilRecovery)
       composeAim()
+    }
+    // 재장전 진행/완료
+    if (reloading) {
+      if (now >= reloadEndT) {
+        reloading = false
+        ammoCur = ammoMax
+        rangeHud.setAmmo(ammoCur, ammoMax, false)
+        sfx.reloadDone()
+      } else {
+        const frac = reloadDurMs > 0 ? 1 - (reloadEndT - now) / reloadDurMs : 1
+        rangeHud.setAmmo(ammoCur, ammoMax, true, frac)
+      }
     }
     // 조준 궤적 가이드 갱신 (현재 조준 방향)
     camera.getWorldDirection(_gDir)
@@ -912,11 +974,21 @@ tick()
   /** QA용 수동 스텝 — 백그라운드 탭 rAF 스로틀 우회. dt 고정 60fps. */
   step: (n = 1) => {
     for (let i = 0; i < n; i++) {
-      if (station === 'range') range.update(1 / 60, performance.now())
+      if (station === 'range') {
+        const now = performance.now()
+        if (reloading && now >= reloadEndT) {
+          reloading = false
+          ammoCur = ammoMax
+          rangeHud.setAmmo(ammoCur, ammoMax, false)
+        }
+        range.update(1 / 60, now)
+      }
       renderer.render(scene, camera)
     }
     return { calls: renderer.info.render.calls, hits: totalHits }
   },
+  ammoState: () => ({ ammoMax, ammoCur, reloading, reloadDurMs }),
+  reload: () => startReload(),
   state: () => ({
     station,
     recoilDeg: Math.round(((recoilPitch * 180) / Math.PI) * 1000) / 1000,
