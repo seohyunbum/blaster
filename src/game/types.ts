@@ -76,6 +76,7 @@ export type MorphKey =
   | 'barrelLength'
   | 'barrelBore'
   | 'barrelTaper'
+  | 'barrelCount'
   // 배럴 장식
   | 'barrelFlare'
   | 'barrelRib'

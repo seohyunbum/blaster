@@ -156,10 +156,11 @@ export function createWorkshopPanel(root: HTMLElement, cb: WorkshopCallbacks) {
         input.type = 'range'
         input.min = '0'
         input.max = '1'
-        input.step = '0.01'
+        // 정수 선택형(총구 개수)은 정수 스텝으로 스냅, 중앙 스냅 없음
+        input.step = p.discrete ? String(1 / Math.max(1, p.max - p.min)) : '0.01'
         input.value = String(t)
         input.className = 'morph-slider'
-        const snap = (raw: number): number => (isShape ? snapCenter(raw) : raw)
+        const snap = (raw: number): number => (isShape && !p.discrete ? snapCenter(raw) : raw)
         input.addEventListener('input', () => {
           cb.onMorphInput(activeSlot, p.key, snap(parseFloat(input.value)))
         })

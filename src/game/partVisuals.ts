@@ -3,7 +3,7 @@
 import * as THREE from 'three'
 import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.js'
 import type { MorphState, PartId, SocketId, ZoneId } from './types.ts'
-import { morphLerp, resolveMorph } from './morph.ts'
+import { morphLerp, resolveMorph, barrelCountFromMorph, barrelLayout } from './morph.ts'
 import { fixedMaterial, glowMaterial } from './materials.ts'
 
 export interface BuildOpts {
@@ -254,28 +254,44 @@ function buildBarrel(partId: PartId, opts: BuildOpts): BuiltPart {
   const group = new THREE.Group()
   const geos: THREE.BufferGeometry[] = []
   const primary: THREE.Mesh[] = []
+  const secondary: THREE.Mesh[] = []
   const accent: THREE.Mesh[] = []
 
   const radial = segFor(opts.lod, 14, 8)
-  // 원기둥 top(+Y→+Z 회전 후 뒤끝)=r, bottom(앞끝)=rFront
+  const count = barrelCountFromMorph(opts.morph)
+  const offsets = barrelLayout(count, r)
+
+  // 총열 count 개 (지오메트리 공유) — 더블배럴·미니건
   const tubeGeo = new THREE.CylinderGeometry(r, rFront, l, radial, 1)
   tubeGeo.rotateX(Math.PI / 2) // 길이축 = Z (03 §1.1)
   geos.push(tubeGeo)
-  const tube = new THREE.Mesh(tubeGeo, fixedMaterial(PLACEHOLDER))
-  tube.position.set(0, 0, -l / 2) // 원점=뒤끝, 전방(-Z)으로 뻗음
-  primary.push(tube)
-  group.add(tube)
-
-  // 머즐링 (앞끝) — accent
   const ringGeo = new THREE.TorusGeometry(rFront * 1.05, rFront * 0.28, 8, radial)
   geos.push(ringGeo)
-  const ring = new THREE.Mesh(ringGeo, fixedMaterial(PLACEHOLDER))
-  ring.position.set(0, 0, -l)
-  accent.push(ring)
-  group.add(ring)
+  for (const [ox, oy] of offsets) {
+    const tube = new THREE.Mesh(tubeGeo, fixedMaterial(PLACEHOLDER))
+    tube.position.set(ox, oy, -l / 2)
+    primary.push(tube)
+    group.add(tube)
+    const ring = new THREE.Mesh(ringGeo, fixedMaterial(PLACEHOLDER))
+    ring.position.set(ox, oy, -l)
+    accent.push(ring)
+    group.add(ring)
+  }
 
-  // 장식 — 나팔 끝 (켰을 때만)
-  const flareT = morphLerp('barrelFlare', resolveMorph(opts.morph, 'barrelFlare'))
+  // 여러 총열이면 뒤쪽을 묶는 허브(개틀링 몸통)
+  if (count > 1) {
+    const hubR = (count === 2 ? r * 1.4 : r * 2.9) + 0.006
+    const hubGeo = new THREE.CylinderGeometry(hubR, hubR, l * 0.32, radial)
+    hubGeo.rotateX(Math.PI / 2)
+    geos.push(hubGeo)
+    const hub = new THREE.Mesh(hubGeo, fixedMaterial(PLACEHOLDER))
+    hub.position.set(0, 0, -l * 0.16)
+    secondary.push(hub)
+    group.add(hub)
+  }
+
+  // 장식 — 나팔 끝 (단일 총열일 때만)
+  const flareT = count === 1 ? morphLerp('barrelFlare', resolveMorph(opts.morph, 'barrelFlare')) : 0
   if (flareT > 0.02) {
     const flareLen = 0.03 + 0.06 * flareT
     // 접합부(뒤끝)=rFront(연속), 앞끝=넓게 → 벨 입구가 전방(-Z)으로 벌어지는 나팔
@@ -288,8 +304,8 @@ function buildBarrel(partId: PartId, opts: BuildOpts): BuiltPart {
     group.add(flare)
   }
 
-  // 장식 — 마디 고리 (배럴을 따라 링이 여러 개)
-  const ribT = morphLerp('barrelRib', resolveMorph(opts.morph, 'barrelRib'))
+  // 장식 — 마디 고리 (단일 총열일 때만, 배럴을 따라 링이 여러 개)
+  const ribT = count === 1 ? morphLerp('barrelRib', resolveMorph(opts.morph, 'barrelRib')) : 0
   if (ribT > 0.02) {
     const count = Math.max(1, Math.round(1 + 4 * ribT))
     for (let i = 0; i < count; i++) {
@@ -311,7 +327,7 @@ function buildBarrel(partId: PartId, opts: BuildOpts): BuiltPart {
 
   return {
     group,
-    zones: { primary, accent },
+    zones: { primary, secondary, accent },
     anchors: { muzzle: muzzleAnchor },
     dispose: () => geos.forEach((g) => g.dispose()),
   }

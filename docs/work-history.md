@@ -81,3 +81,11 @@
 - **[낮] F 경통 렌즈**(작은 크기서 묻힘)·**G 반짝이 별**(길고 작을 때 분리) → 앞면 바깥 고정.
 - **[낮/기존] H 부스터 지느러미**: 원점 회전이라 콘에 완전 매몰(항상 안 보임) → 콘 반경 밖으로 방사 배치.
 - **검증**: 부착 파츠 bbox×몸통 bbox join축 간극 실측 = 전부 음수(겹침=부착, 부유 0). 46테스트·typecheck·build. 기본 룩 보존(그립 기본 간극 불변).
+
+## 2026-07-18 — 총구 여러 개(더블배럴·미니건)
+
+별도 슬롯 확장 대신 배럴에 `barrelCount` morph(1~6, discrete) 추가.
+- `MorphParamDef.discrete` 신설 — UI 중앙스냅 없이 정수 스텝(step=1/(max-min)). barrelCount 는 shape 그룹·defaultT 0(기본 1개)·스탯 0(다발 발사가 보상).
+- `barrelLayout(count,r)`: 1=중앙·2=나란히·3+=링 클러스터(개틀링). buildBarrel 이 총열 count 개(지오 공유)+개틀링 허브 렌더, count>1 이면 나팔/마디고리 장식 게이트 오프(예산 유지: 미니건 6열=6튜브+6링+허브=13≤14).
+- 발사: `fire()` 가 `barrelCountFromMorph` 만큼 range.fireOne — 좌우 fan 퍼짐. 반동은 다발 비례 소폭↑(RECOIL_MAX 클램프 내). 검증: 미니건 1트리거→6발→6명중.
+- 테스트: barrelCount 총열 메시 증가·예산 확인(총 47).

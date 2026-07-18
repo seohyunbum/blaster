@@ -5,7 +5,7 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js'
 
 import type { Blaster, MorphKey, MorphState, PartPaint, SlotType } from './game/types.ts'
 import { computeStats, partsForSlot } from './game/parts.ts'
-import { boreScaleFromMorph, archetypeForSlot } from './game/morph.ts'
+import { boreScaleFromMorph, archetypeForSlot, barrelCountFromMorph } from './game/morph.ts'
 import { ALL_PALETTE_KEYS, isBright } from './game/palette.ts'
 import {
   toShotProfile,
@@ -654,18 +654,34 @@ function composeAim(): void {
   camera.quaternion.setFromEuler(_aimEuler)
 }
 
+const _fireRight = new THREE.Vector3()
+const _fireUp = new THREE.Vector3()
+const _fireDir = new THREE.Vector3()
 function fire(): void {
   const stats = computeStats(active)
   const bore = boreScaleFromMorph(active.parts.barrel?.morph ?? {})
   const profile = toShotProfile(stats, bore)
+  const count = barrelCountFromMorph(active.parts.barrel?.morph ?? {})
   const dir = new THREE.Vector3()
   camera.getWorldDirection(dir)
   const origin = camera.position.clone().addScaledVector(dir, 0.5)
-  range.fireOne(profile, origin, dir)
+  // 총열 수만큼 발사 — 더블배럴 2발·미니건 6발. 좌우로 살짝 퍼뜨려 여러 개가 보이게
+  _fireRight.crossVectors(dir, camera.up).normalize()
+  _fireUp.crossVectors(_fireRight, dir).normalize()
+  for (let i = 0; i < count; i++) {
+    const off = count === 1 ? 0 : (i / (count - 1) - 0.5) * 2 // -1..1
+    const fan = 0.03 // 퍼짐 반경(rad)
+    _fireDir
+      .copy(dir)
+      .addScaledVector(_fireRight, off * fan)
+      .addScaledVector(_fireUp, (count > 2 ? Math.sin(i) * 0.4 : 0) * fan)
+      .normalize()
+    range.fireOne(profile, origin, _fireDir)
+  }
   shotsFired += 1
-  // 누적 상한 클램프 (설계 RECOIL_MAX_DEG) — 느린 복귀와 짝
+  // 누적 상한 클램프 (설계 RECOIL_MAX_DEG) — 느린 복귀와 짝. 다발이면 반동 약간↑(상한 내)
   recoilPitch = Math.min(
-    recoilPitch + (profile.recoilKickDeg * Math.PI) / 180,
+    recoilPitch + (profile.recoilKickDeg * Math.PI * (1 + (count - 1) * 0.15)) / 180,
     RECOIL_MAX_RAD,
   )
   sfx.shoot()

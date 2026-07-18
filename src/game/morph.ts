@@ -26,6 +26,8 @@ export interface MorphParamDef {
   max: number
   /** 미지정 시 기본 t. shape=0.5(중립), deco=0(없음). */
   defaultT: number
+  /** 정수 값 선택형(예: 총구 개수) — UI 중앙 스냅 없이 정수 스텝. */
+  discrete?: boolean
   /** t=0·t=1 스탯 델타. piecewise 두-기울기로 t=0.5 에서 0. 장식은 전부 {} (순수 멋). */
   deltaAt0: StatDelta
   deltaAt1: StatDelta
@@ -177,6 +179,20 @@ export const MORPH_PARAMS: readonly MorphParamDef[] = [
     defaultT: 0.5,
     deltaAt0: { power: 0.5, accuracy: -0.5 },
     deltaAt1: { accuracy: 0.5 },
+  },
+  {
+    key: 'barrelCount',
+    archetype: 'barrel',
+    group: 'shape',
+    labelKo: '총구 개수',
+    minLabelKo: '1개',
+    maxLabelKo: '미니건',
+    min: 1,
+    max: 6, // 총열 개수 — 쏠 때도 이 수만큼 발사(더블배럴·미니건)
+    defaultT: 0, // 기본 1개
+    discrete: true,
+    deltaAt0: {},
+    deltaAt1: {}, // 스탯 무관 — 다발 발사가 보상
   },
   // ── 배럴 · 장식 (기본 없음) ──
   {
@@ -393,6 +409,31 @@ export function pruneMorph(state: MorphState): MorphState {
 export function boreScaleFromMorph(state: MorphState): number {
   const t = resolveMorph(state, 'barrelBore')
   return 0.9 + (1.3 - 0.9) * t
+}
+
+/** 총구(총열) 개수 1~6 — 더블배럴·미니건. 발사도 이 수만큼. */
+export function barrelCountFromMorph(state: MorphState): number {
+  const n = Math.round(morphLerp('barrelCount', resolveMorph(state, 'barrelCount')))
+  return n < 1 ? 1 : n > 6 ? 6 : n
+}
+
+/** count 개 총열의 (x,y) 배치 — 1:중앙, 2:나란히, 3+:링 클러스터(미니건). */
+export function barrelLayout(count: number, r: number): [number, number][] {
+  if (count <= 1) return [[0, 0]]
+  if (count === 2) {
+    const s = r * 1.15
+    return [
+      [-s, 0],
+      [s, 0],
+    ]
+  }
+  const rr = r * 2.2
+  const out: [number, number][] = []
+  for (let i = 0; i < count; i++) {
+    const a = (i / count) * Math.PI * 2 - Math.PI / 2
+    out.push([Math.cos(a) * rr, Math.sin(a) * rr])
+  }
+  return out
 }
 
 // ─── 토이 프로포션 봉투 상수 (09 §7) ───
