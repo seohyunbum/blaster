@@ -9,6 +9,8 @@ export interface CollectionCallbacks {
   onDuplicate: (id: string) => void
   onRename: (id: string, name: string) => void
   onDelete: (id: string) => void
+  onExport: () => void
+  onImportFile: (file: File) => void
 }
 
 export function createCollectionPanel(root: HTMLElement, cb: CollectionCallbacks) {
@@ -20,6 +22,29 @@ export function createCollectionPanel(root: HTMLElement, cb: CollectionCallbacks
   newBtn.textContent = '＋ 새 블래스터'
   newBtn.addEventListener('click', () => cb.onNew())
   root.appendChild(newBtn)
+
+  // 백업 파일 내보내기/불러오기 — 코드 업데이트와 무관하게 내 총들을 안전 보관
+  const backupRow = document.createElement('div')
+  backupRow.className = 'backup-row'
+  const exportBtn = document.createElement('button')
+  exportBtn.className = 'backup-btn'
+  exportBtn.textContent = '💾 백업 저장'
+  exportBtn.addEventListener('click', () => cb.onExport())
+  const importBtn = document.createElement('button')
+  importBtn.className = 'backup-btn'
+  importBtn.textContent = '📂 백업 불러오기'
+  const fileInput = document.createElement('input')
+  fileInput.type = 'file'
+  fileInput.accept = 'application/json,.json'
+  fileInput.style.display = 'none'
+  fileInput.addEventListener('change', () => {
+    const f = fileInput.files?.[0]
+    if (f) cb.onImportFile(f)
+    fileInput.value = '' // 같은 파일 재선택 허용
+  })
+  importBtn.addEventListener('click', () => fileInput.click())
+  backupRow.append(exportBtn, importBtn, fileInput)
+  root.appendChild(backupRow)
 
   const list = document.createElement('div')
   list.className = 'collection-list'

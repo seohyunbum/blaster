@@ -8,7 +8,10 @@ export const SAVE_VERSION = 1
 export const KEY_PREFIX = 'blaster_lab_'
 const PROFILE_ID = 'p1' // M1 단일 프로필 (닉네임 프로필은 M2)
 const SAVE_KEY = `${KEY_PREFIX}save_${PROFILE_ID}`
-const BACKUP_KEY = `${KEY_PREFIX}backup_${PROFILE_ID}`
+const BACKUP_KEY = `${KEY_PREFIX}backup_${PROFILE_ID}` // 레거시 단일 백업
+const RING = 5 // 롤링 백업 개수 — 최근 N개 저장본 보관(손상 복구용)
+const RING_KEYS = Array.from({ length: RING }, (_, i) => `${KEY_PREFIX}bak${i}_${PROFILE_ID}`)
+const RING_PTR_KEY = `${KEY_PREFIX}bakptr_${PROFILE_ID}`
 
 export interface CourseRecord {
   stars: 0 | 1 | 2 | 3
@@ -226,33 +229,98 @@ function hasStorage(): boolean {
   }
 }
 
-export function loadSave(now: number): SavedGame {
-  if (!hasStorage()) return createDefaultSave(now)
+function safeGet(k: string): string | null {
   try {
-    const raw = localStorage.getItem(SAVE_KEY)
-    if (raw) return normalizeSave(JSON.parse(raw), now)
+    return localStorage.getItem(k)
   } catch {
-    // 파손 — 백업 시도
-    try {
-      const bak = localStorage.getItem(BACKUP_KEY)
-      if (bak) return normalizeSave(JSON.parse(bak), now)
-    } catch {
-      /* 무시 */
-    }
+    return null
   }
-  return createDefaultSave(now)
 }
 
-/** 성공 직전 값을 백업 키에 남기고 저장. 실패해도 throw 하지 않는다. */
+function parseObj(raw: string | null): Record<string, unknown> | null {
+  if (!raw) return null
+  try {
+    const o = JSON.parse(raw)
+    return o && typeof o === 'object' ? (o as Record<string, unknown>) : null
+  } catch {
+    return null
+  }
+}
+
+export function loadSave(now: number): SavedGame {
+  if (!hasStorage()) return createDefaultSave(now)
+  // 정상 경로: 메인 세이브가 읽히면 그걸 쓴다(삭제 등 사용자 의도 존중)
+  const main = parseObj(safeGet(SAVE_KEY))
+  if (main) return normalizeSave(main, now)
+  // 메인 손상/부재 → 백업들 중 "블래스터가 가장 많은" 것으로 복구 (유실 최소화)
+  let best: SavedGame | null = null
+  for (const k of [BACKUP_KEY, ...RING_KEYS]) {
+    const p = parseObj(safeGet(k))
+    if (!p) continue
+    const s = normalizeSave(p, now)
+    if (!best || s.blasters.length > best.blasters.length) best = s
+  }
+  return best ?? createDefaultSave(now)
+}
+
+/** 저장 — 이전 값을 롤링 백업(최근 5개)+레거시 백업에 남긴 뒤 메인 갱신. 실패해도 throw 안 함. */
 export function persistSave(save: SavedGame): boolean {
   if (!hasStorage()) return false
   try {
-    const prev = localStorage.getItem(SAVE_KEY)
-    if (prev) localStorage.setItem(BACKUP_KEY, prev)
+    const prev = safeGet(SAVE_KEY)
+    if (prev) {
+      // 이전 저장본을 롤링 백업 링에 기록(라운드로빈)
+      let ptr = parseInt(safeGet(RING_PTR_KEY) ?? '0', 10)
+      if (!Number.isFinite(ptr) || ptr < 0 || ptr >= RING) ptr = 0
+      try {
+        localStorage.setItem(RING_KEYS[ptr]!, prev)
+        localStorage.setItem(RING_PTR_KEY, String((ptr + 1) % RING))
+        localStorage.setItem(BACKUP_KEY, prev)
+      } catch {
+        /* 백업 실패는 메인 저장을 막지 않는다 */
+      }
+    }
     save.updatedAt = Date.now()
     localStorage.setItem(SAVE_KEY, JSON.stringify(save))
     return true
   } catch {
     return false
   }
+}
+
+// ─── 백업 파일 내보내기/불러오기 (사용자 소유 사본 — 코드 버그와 무관) ───
+const EXPORT_TAG = 'blaster-lab-collection'
+
+/** 보관함 전체를 파일용 JSON 문자열로. */
+export function exportSaveText(save: SavedGame): string {
+  return JSON.stringify({ tag: EXPORT_TAG, version: SAVE_VERSION, exportedAt: Date.now(), save }, null, 2)
+}
+
+/**
+ * 백업 파일을 현재 세이브에 병합(기본) — 이미 있는 id 는 건너뛰어 아무것도 잃지 않는다.
+ * 반환: { save: 병합본, added: 새로 들어온 개수 } · 형식 불명이면 null.
+ */
+export function importInto(current: SavedGame, text: string, now: number): { save: SavedGame; added: number } | null {
+  const parsed = parseObj(text)
+  if (!parsed) return null
+  // 내보낸 래퍼({tag,save}) 또는 세이브 자체 또는 blasters 배열만 있어도 수용
+  const rawSave =
+    parsed.save && typeof parsed.save === 'object'
+      ? parsed.save
+      : Array.isArray(parsed.blasters)
+        ? parsed
+        : null
+  if (!rawSave) return null
+  const incoming = normalizeSave(rawSave, now)
+  const haveIds = new Set(current.blasters.map((b) => b.id))
+  let added = 0
+  for (const b of incoming.blasters) {
+    if (haveIds.has(b.id)) continue // 중복 id 는 건너뜀(현재 것 우선 — 유실 0)
+    current.blasters.push(b)
+    haveIds.add(b.id)
+    added += 1
+  }
+  const unlocked = new Set([...current.unlockedPartIds, ...incoming.unlockedPartIds])
+  current.unlockedPartIds = [...unlocked]
+  return { save: current, added }
 }

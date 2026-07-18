@@ -22,6 +22,8 @@ import {
   makeInstance,
   createStarterBlaster,
   cloneBlaster,
+  exportSaveText,
+  importInto,
   type SavedGame,
 } from './game/save.ts'
 import { resumeAudio, sfx, setAudioEnabled } from './game/audio.ts'
@@ -175,6 +177,8 @@ const collectionPanel = createCollectionPanel(collectionRoot, {
   onDuplicate: (id) => duplicateBlaster(id),
   onRename: (id, name) => renameBlaster(id, name),
   onDelete: (id) => deleteBlaster(id),
+  onExport: () => exportBackup(),
+  onImportFile: (file) => importBackup(file),
 })
 
 // ─── 편집 뷰 재빌드 ─────────────────────────────────────────
@@ -314,6 +318,37 @@ function renameBlaster(id: string, name: string): void {
   // 재생성하면 뒤이은 click 대상 노드가 사라져 첫 클릭이 삼켜진다(QA 확정). 이름은 이미
   // input 에 반영돼 있고 카드 스탯·스와치는 이름과 무관하다.
   autosave()
+}
+
+function exportBackup(): void {
+  const text = exportSaveText(save)
+  const blob = new Blob([text], { type: 'application/json' })
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = `블래스터_공방_백업_${save.blasters.length}개.json`
+  a.click()
+  URL.revokeObjectURL(url)
+  sfx.star()
+  showToast(`백업 파일을 저장했어요 (블래스터 ${save.blasters.length}개)`)
+}
+
+function importBackup(file: File): void {
+  const reader = new FileReader()
+  reader.onload = () => {
+    const text = typeof reader.result === 'string' ? reader.result : ''
+    const res = importInto(save, text, Date.now())
+    if (!res) {
+      showToast('백업 파일을 읽지 못했어요')
+      return
+    }
+    persistSave(save)
+    refreshPanels()
+    sfx.star()
+    showToast(res.added > 0 ? `블래스터 ${res.added}개를 불러왔어요!` : '이미 다 있는 블래스터예요')
+  }
+  reader.onerror = () => showToast('파일을 여는 데 실패했어요')
+  reader.readAsText(file)
 }
 
 function deleteBlaster(id: string): void {
@@ -911,4 +946,17 @@ function el(tag: string, cls: string): HTMLElement {
   const e = document.createElement(tag)
   if (cls) e.className = cls
   return e
+}
+
+let toastTimer = 0
+function showToast(msg: string): void {
+  let t = document.querySelector('.toast') as HTMLElement | null
+  if (!t) {
+    t = el('div', 'toast')
+    app.appendChild(t)
+  }
+  t.textContent = msg
+  t.classList.add('show')
+  clearTimeout(toastTimer)
+  toastTimer = window.setTimeout(() => t?.classList.remove('show'), 2600)
 }

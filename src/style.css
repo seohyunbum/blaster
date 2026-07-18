@@ -462,10 +462,46 @@ body {
   cursor: pointer;
   box-shadow: var(--shadow);
 }
+.backup-row {
+  display: flex;
+  gap: 8px;
+}
+.backup-btn {
+  flex: 1;
+  border: 2px solid var(--panel-line);
+  background: #f4f8fc;
+  border-radius: 12px;
+  padding: 10px 6px;
+  font-weight: 700;
+  font-size: 13px;
+  color: var(--ink);
+  cursor: pointer;
+}
 .collection-list {
   display: flex;
   flex-direction: column;
   gap: 10px;
+}
+.toast {
+  position: absolute;
+  left: 50%;
+  bottom: 22px;
+  transform: translate(-50%, 20px);
+  background: rgba(30, 45, 70, 0.94);
+  color: #fff;
+  font-weight: 800;
+  font-size: 15px;
+  padding: 12px 20px;
+  border-radius: 999px;
+  box-shadow: var(--shadow);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.2s, transform 0.2s;
+  z-index: 20;
+}
+.toast.show {
+  opacity: 1;
+  transform: translate(-50%, 0);
 }
 .collection-card {
   display: flex;
