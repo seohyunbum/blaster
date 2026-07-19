@@ -1,0 +1,52 @@
+name: Deploy to GitHub Pages
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# 하나의 배포만 동시 진행. 진행 중 배포는 취소하지 않는다(취소 시 Pages 환경이 잠긴 채
+# 남아 다음 deploy-pages 가 즉시 실패). GitHub 공식 Pages 템플릿 권장값과 동일.
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run build # tsc --noEmit && vite build (base './' → 상대경로 = 서브패스 무관)
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: dist
+
+  # deploy-pages 는 이전 배포 finalize 와 경합하면 몇 초 만에 일시 실패하는 일이 있다
+  # (빌드는 성공·재시도 1회로 해결). 외부 액션 없이 네이티브 재시도 1회로 자동 복구.
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url || steps.deployment_retry.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4
+        continue-on-error: true
+      - name: Wait before retry (previous deployment finalize race)
+        if: steps.deployment.outcome == 'failure'
+        run: sleep 30
+      - id: deployment_retry
+        name: Retry deploy once
+        if: steps.deployment.outcome == 'failure'
+        uses: actions/deploy-pages@v4

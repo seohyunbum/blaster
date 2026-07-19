@@ -600,6 +600,28 @@ body {
 #app.range-mode {
   grid-template-columns: 1fr 0;
 }
+
+/* ── 모바일 세로(폰): 340px 옆패널이 3D 뷰를 뭉개므로 아래로 쌓는다 ──
+   상단 바(60px, HUD inset 과 일치) / 3D 뷰(42vh) / 제작 패널(나머지·세로 스크롤). */
+@media (max-width: 640px) {
+  #app {
+    grid-template-columns: 1fr;
+    grid-template-rows: 60px 42vh 1fr;
+    grid-template-areas:
+      'bar'
+      'canvas'
+      'panel';
+  }
+  .panel-host {
+    border-left: none;
+    border-top: 2px solid var(--panel-line);
+  }
+  /* 사격장: 3D 뷰가 화면을 꽉 채우게(제작 패널 행 0) */
+  #app.range-mode {
+    grid-template-columns: 1fr;
+    grid-template-rows: 60px 1fr 0;
+  }
+}
 .crosshair {
   position: absolute;
   left: 50%;
