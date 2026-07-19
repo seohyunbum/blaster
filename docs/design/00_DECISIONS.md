@@ -59,3 +59,6 @@
 - **2026-07-18 · 검정 본체색 허용 + 미니건 손잡이(몸통 위 그립)** (사용자 명시 요청).
   - **08 §1.2 "primary=밝은 색만" 부분 완화**: 검정(toyBlack)만 본체색 허용(`canBePrimary`). 어두운 회색(toyGrayDark)은 계속 secondary/accent 전용. toyBlack hex 0x2b2f36→0x1e2126.
   - **02 그립 로스터에 grip_minigun 추가**: 몸통 위(gripTop 앵커) 장착 스페이드 핸들. 그립 슬롯은 유지하되 이 파츠만 상단 마운트로 라우팅(assembly). anchors 키에 'gripTop' 특수 마운트 도입.
+
+- **2026-07-19 · 미니건 코어(초대형 구형 몸통) 추가** (사용자 명시 요청 "동그랗게 생기고 엄청나게 큰 미니건 몸통").
+  - **02 §3.1 몸통 로스터에 body_minigun 추가**: 전 몸통 중 최대 실루엣의 구형(sphere) 프레임. BODY_DIMS `w/h 0.36·d 0.52`(오브 0.19 대비 폭·높이 ~2배). base P8/R5/A3/W9·weightLimit 18(가장 무겁고 든든, 대신 정확도 낮음). additive 라 기존 저장 총 무영향. 명명: `minigun` 토큰은 금칙어 사전에 없음(기존 grip_minigun·barrelCount 선례와 동일 정책).

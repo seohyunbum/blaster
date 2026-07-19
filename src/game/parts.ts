@@ -92,6 +92,16 @@ export const BODIES: readonly BodyDef[] = [
     weightLimit: 11,
     sockets: ['barrel', 'sight', 'grip', 'stock', 'muzzle', 'magazine'],
   },
+  {
+    id: 'body_minigun',
+    slot: 'body',
+    nameKo: '미니건 코어',
+    desc: '동그랗고 엄청나게 큰 왕구슬 프레임. 우람하고 든든해요',
+    delta: {},
+    base: { power: 8, fireRate: 5, accuracy: 3, weight: 9 },
+    weightLimit: 18,
+    sockets: ['barrel', 'sight', 'grip', 'stock', 'muzzle', 'magazine'],
+  },
 ]
 
 // ─── 부착 파츠 (배럴·조준기·그립·스톡·머즐) ──────────────────

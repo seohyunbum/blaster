@@ -41,6 +41,8 @@ const BODY_DIMS: Record<string, BodyDims> = {
   body_orb: { w: 0.19, h: 0.19, d: 0.34, shell: 'sphere' },
   body_wedge: { w: 0.15, h: 0.13, d: 0.48, shell: 'box' },
   body_chunk: { w: 0.22, h: 0.17, d: 0.42, shell: 'box' },
+  // 미니건 코어 — 동그랗고 압도적으로 큰 왕구슬(전 몸통 중 최대 실루엣)
+  body_minigun: { w: 0.36, h: 0.36, d: 0.52, shell: 'sphere' },
 }
 
 /** 몸통 셸 지오메트리 — 실루엣 자체를 바꾼다(박스/캡슐/구). */
