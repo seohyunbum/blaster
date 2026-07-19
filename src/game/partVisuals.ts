@@ -646,7 +646,7 @@ function buildMagazine(partId: PartId, opts: BuildOpts): BuiltPart {
     // 드럼통 — 옆으로 누운 꽉 찬 원반(축=X). 목으로 몸통에 연결.
     // 드럼은 총구 쪽(앞=-Z)으로 조금 당겨 실제 드럼탄창처럼 배럴 밑에 오게 한다.
     const R = 0.058 * sz * (0.85 + 0.3 * ln)
-    const zFwd = -0.05 * sz // 앞으로 이동량
+    const zFwd = -0.085 * sz // 앞으로 이동량 (총구 쪽으로 조금 더)
     const drumGeo = new THREE.CylinderGeometry(R, R, 0.05 * sz, seg)
     drumGeo.rotateZ(Math.PI / 2)
     geos.push(drumGeo)
