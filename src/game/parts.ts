@@ -193,6 +193,15 @@ export const PARTS: readonly PartDef[] = [
     capacity: 30,
     reloadSec: 3.2,
   },
+  {
+    id: 'mag_revolver',
+    slot: 'magazine',
+    nameKo: '리볼버 실린더',
+    desc: '6발. 빙글빙글 도는 동그란 실린더. 서부극처럼 척!',
+    delta: { accuracy: 1, weight: 1 },
+    capacity: 6,
+    reloadSec: 1.5,
+  },
   // 조준기 4종
   {
     id: 'sight_dot',
@@ -250,6 +259,13 @@ export const PARTS: readonly PartDef[] = [
     nameKo: '미니건 손잡이',
     desc: '총 몸통 위에 얹는 커다란 스페이드 손잡이. 두 손으로 꽉!',
     delta: { accuracy: 1, weight: 1 },
+  },
+  {
+    id: 'grip_revolver',
+    slot: 'grip',
+    nameKo: '리볼버 그립',
+    desc: '서부 총잡이처럼 뒤로 둥글게 말린 손잡이. 뒤꿈치가 통통!',
+    delta: { accuracy: 1 },
   },
   // 스톡 4종
   {

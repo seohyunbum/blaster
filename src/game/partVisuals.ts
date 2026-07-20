@@ -487,6 +487,44 @@ function buildGrip(partId: PartId, opts: BuildOpts): BuiltPart {
     }
   }
 
+  // ── 리볼버 그립 — 뒤로 둥글게 말린 서부식 손잡이(둥근 뒤꿈치) ──
+  if (partId === 'grip_revolver') {
+    const rgr = 0.028 * gThick
+    const rlen = 0.085 * gLen
+    const ang = 0.5 + gAng * 0.35 // 기본적으로 뒤로 더 젖힘(서부식)
+    const gy = 0.008 - (0.045 * gLen * Math.cos(ang) + rgr)
+    // 손잡이 몸통 — 뒤로 젖힌 캡슐
+    const gGeo = new THREE.CapsuleGeometry(rgr, rlen, 3, seg)
+    geos.push(gGeo)
+    const g = new THREE.Mesh(gGeo, fixedMaterial(PLACEHOLDER))
+    g.rotation.x = ang
+    g.position.set(0, gy, 0.02)
+    primary.push(g)
+    group.add(g)
+    // 둥근 뒤꿈치(heel) — 캡슐 아래끝(젖힌 축 방향)에 통통한 공
+    const L = rlen * 0.5 + rgr * 0.4
+    const heelGeo = new THREE.SphereGeometry(rgr * 1.3, seg, seg)
+    geos.push(heelGeo)
+    const heel = new THREE.Mesh(heelGeo, fixedMaterial(PLACEHOLDER))
+    heel.position.set(0, gy - L * Math.cos(ang), 0.02 - L * Math.sin(ang))
+    primary.push(heel)
+    group.add(heel)
+    // 링 장식
+    const kGeo = new THREE.TorusGeometry(rgr * 1.12, 0.005 * gThick, 6, seg)
+    geos.push(kGeo)
+    const k = new THREE.Mesh(kGeo, fixedMaterial(PLACEHOLDER))
+    k.rotation.x = ang + Math.PI / 2
+    k.position.set(0, gy + rlen * 0.18 * Math.cos(ang), 0.02 - rlen * 0.18 * Math.sin(ang))
+    accent.push(k)
+    group.add(k)
+    return {
+      group,
+      zones: { primary, accent },
+      anchors: {},
+      dispose: () => geos.forEach((geo) => geo.dispose()),
+    }
+  }
+
   const gr = (banana ? 0.026 : 0.024) * gThick
 
   const gripGeo = new THREE.CapsuleGeometry(gr, 0.09 * gLen, 3, seg)
@@ -642,7 +680,48 @@ function buildMagazine(partId: PartId, opts: BuildOpts): BuiltPart {
   const sz = morphLerp('magSize', resolveMorph(opts.morph, 'magSize'))
   const ln = morphLerp('magLength', resolveMorph(opts.morph, 'magLength'))
 
-  if (partId === 'mag_drum') {
+  if (partId === 'mag_revolver') {
+    // 리볼버 실린더 — 배럴 방향(축=Z)으로 누운 통통한 회전 실린더. 앞면에 다트 6발이 링으로 보인다(토이 시그니처).
+    // 통통하고 짧은 실린더(지름>길이) = 리볼버 실루엣. 몸통 밑에 바싹 붙여 매단다.
+    const R = 0.058 * sz
+    const cylLen = 0.05 * sz * (0.9 + 0.25 * ln)
+    const cy = -0.022 // 몸통 밑면에 바싹(부유 방지, 살짝 파묻힘)
+    const cz = -0.045 * sz // 총구 쪽으로 전진(리볼버 실린더 위치)
+    const cylGeo = new THREE.CylinderGeometry(R, R, cylLen, seg)
+    cylGeo.rotateX(Math.PI / 2) // 축 = Z (배럴 방향)
+    geos.push(cylGeo)
+    const cyl = new THREE.Mesh(cylGeo, fixedMaterial(PLACEHOLDER))
+    cyl.position.set(0, cy, cz)
+    primary.push(cyl)
+    group.add(cyl)
+    // 중심 축(요크 핀) — 고정색(비색칠)
+    const axleGeo = new THREE.CylinderGeometry(R * 0.16, R * 0.16, cylLen * 1.25, seg)
+    axleGeo.rotateX(Math.PI / 2)
+    geos.push(axleGeo)
+    const axle = new THREE.Mesh(axleGeo, fixedMaterial(0xd9dde3))
+    axle.position.set(0, cy, cz)
+    group.add(axle)
+    // 챔버에 담긴 다트 6발 — 앞면(-Z)에서 뚜렷이 튀어나오는 링(고정 주황, 토이 시그니처)
+    const dartLen = cylLen * 1.35
+    const dartGeo = new THREE.CylinderGeometry(R * 0.17, R * 0.17, dartLen, Math.max(6, Math.floor(seg / 2)))
+    dartGeo.rotateX(Math.PI / 2)
+    geos.push(dartGeo)
+    const chamberR = R * 0.62
+    const dartZ = cz - cylLen * 0.35 // 앞끝이 실린더 앞면 밖으로 확실히 나오게
+    for (let i = 0; i < 6; i++) {
+      const a = (i / 6) * Math.PI * 2 - Math.PI / 2
+      const dart = new THREE.Mesh(dartGeo, fixedMaterial(0xff8a2b)) // blasterOrange
+      dart.position.set(Math.cos(a) * chamberR, cy + Math.sin(a) * chamberR, dartZ)
+      group.add(dart)
+    }
+    // 톱 스트랩 — 실린더와 몸통을 잇는 얇은 연결(리볼버 프레임 느낌, 부유 방지)
+    const strapGeo = new THREE.BoxGeometry(R * 0.5, 0.035, cylLen)
+    geos.push(strapGeo)
+    const strap = new THREE.Mesh(strapGeo, fixedMaterial(PLACEHOLDER))
+    strap.position.set(0, cy + R + 0.004, cz)
+    secondary.push(strap)
+    group.add(strap)
+  } else if (partId === 'mag_drum') {
     // 드럼통 — 옆으로 누운 꽉 찬 원반(축=X). 목으로 몸통에 연결.
     // 드럼은 총구 쪽(앞=-Z)으로 조금 당겨 실제 드럼탄창처럼 배럴 밑에 오게 한다.
     const R = 0.058 * sz * (0.85 + 0.3 * ln)
