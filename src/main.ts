@@ -5,7 +5,7 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js'
 
 import type { Blaster, MorphKey, MorphState, PartPaint, SlotType } from './game/types.ts'
 import { computeStats, partsForSlot } from './game/parts.ts'
-import { boreScaleFromMorph, archetypeForSlot, barrelCountFromMorph } from './game/morph.ts'
+import { boreScaleFromMorph, archetypeForSlot } from './game/morph.ts'
 import { ALL_PALETTE_KEYS, canBePrimary } from './game/palette.ts'
 import {
   toShotProfile,
@@ -748,7 +748,8 @@ const _fireDir = new THREE.Vector3()
 function fire(): void {
   // 재장전 중엔 발사 불가
   if (reloading) return
-  const count = barrelCountFromMorph(active.parts.barrel?.morph ?? {})
+  // 총구가 몇 개든 총알은 항상 1발 (사용자 요청). 총구 개수는 연사(computeStats)·모양에만 반영.
+  const count = 1
   // 탄창 장착 시: 남은 탄만큼만 발사. 비어 있으면 재장전 시작하고 이번 발사는 건너뜀
   let shots = count
   if (ammoMax > 0) {
@@ -765,7 +766,7 @@ function fire(): void {
   const dir = new THREE.Vector3()
   camera.getWorldDirection(dir)
   const origin = camera.position.clone().addScaledVector(dir, 0.5)
-  // 발사 수만큼 발사 — 더블배럴 2발·미니건 6발. 좌우로 살짝 퍼뜨려 여러 개가 보이게
+  // 항상 1발만 발사 (shots===1). 총구가 많아도 총알은 한 개.
   _fireRight.crossVectors(dir, camera.up).normalize()
   _fireUp.crossVectors(_fireRight, dir).normalize()
   for (let i = 0; i < shots; i++) {
