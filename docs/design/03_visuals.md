@@ -248,7 +248,7 @@ export function paintMaterial(color: PaletteKey, finish: Finish): THREE.MeshStan
 |---|---|
 | 머티리얼 이론 상한 (03 소유) | 36키 × 3 finish = 108 + vertex color 3 + 고정(발광·투명창·안전팁 등) ~10 + 오버레이 1 ≈ **122** |
 | 실제 동시 사용 (총 1자루, M1) | 파츠 ≤3(몸통+배럴+사이트) × 존 ≤3 → **≤9** (같은 색끼리 캐시 공유로 실제 더 적음) |
-| draw call·메시·씬 예산 | **정본 = 07 단일표** (결정문 23): 블래스터 draw call ≤12 · 파츠당 메시 ≤6 · 씬 총 300. morph 는 메시 수·머티리얼 수·draw call 을 바꾸지 않으므로(지오메트리 attribute 만 교체 — 09 §3.5) 예산표에 morph 항목이 따로 없다 |
+| draw call·메시·씬 예산 | **정본 = 07 단일표** (결정문 23): 블래스터 draw call ≤56 · 파츠당 메시 ≤14 · 씬 총 300. morph 는 메시 수·머티리얼 수·draw call 을 바꾸지 않으므로(지오메트리 attribute 만 교체 — 09 §3.5) 예산표에 morph 항목이 따로 없다 |
 | geometry | **공유 규칙 개정 (09 §3.1)**: morph 대상 파츠(body·barrel)의 지오메트리는 **인스턴스 소유** — 재생성 시 이전 것을 즉시 dispose(`BuiltPart.dispose`). 비대상 파츠(sight 도트 등)만 종전대로 모듈 레벨 base geometry 공유. 줄무늬 존 clone 도 파츠 제거 시 dispose |
 
 **호버 하이라이트의 공유 머티리얼 오염 함정** — `mesh.material.emissive` 직접 수정은 금지. 캐시된 머티리얼이라 같은 색을 쓴 **다른 파츠까지 같이 빛난다**. 해결: 오버레이 클론 그룹 방식(§6, M2). 색 변경도 `material.color.set()` 이 아니라 **캐시에서 새 머티리얼을 받아 교체**한다 (같은 이유). morph 재빌드 후 페인트 재적용도 같은 경로(캐시 조회 후 할당)라 추가 비용 0.

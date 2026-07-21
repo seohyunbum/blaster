@@ -3,23 +3,19 @@ import './style.css'
 import * as THREE from 'three'
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js'
 
-import type { Blaster, MorphKey, MorphState, PartPaint, SlotType } from './game/types.ts'
-import { computeStats, partsForSlot } from './game/parts.ts'
-import { boreScaleFromMorph, archetypeForSlot } from './game/morph.ts'
-import { ALL_PALETTE_KEYS, canBePrimary } from './game/palette.ts'
+import type { Blaster, MorphKey, SlotType, ZoneId } from './game/types.ts'
+import { CATALOG, computeStats } from './game/parts.ts'
+import { boreScaleFromMorph } from './game/morph.ts'
 import {
   toShotProfile,
-  PROJECTILE_GRAVITY,
-  recoveryDegPerSec,
-  RECOIL_MAX_DEG,
 } from './game/ballistics.ts'
-import { buildBlaster, type BuiltBlaster } from './game/assembly.ts'
+import { buildBlaster, paintableZones, type BuiltBlaster } from './game/assembly.ts'
 import { installEnvironment } from './game/materials.ts'
 import { RangeController } from './game/range.ts'
+import { RangeSession } from './game/rangeSession.ts'
 import {
   loadSave,
   persistSave,
-  makeInstance,
   createStarterBlaster,
   cloneBlaster,
   exportSaveText,
@@ -27,14 +23,14 @@ import {
   type SavedGame,
 } from './game/save.ts'
 import { resumeAudio, sfx, setAudioEnabled } from './game/audio.ts'
-import { MORPH_PARAMS } from './game/morph.ts'
-import { PRESETS, PRESET_ZONE_ORDER } from './game/presets.ts'
+import { STATION_DEFS } from './game/definitions.ts'
+import { EditorSession } from './game/editorSession.ts'
 
 import { createStationBar, type StationId } from './ui/stationBar.ts'
 import { createWorkshopPanel } from './ui/workshopPanel.ts'
 import { createPaintPanel } from './ui/paintPanel.ts'
-import { createRangeHud, MAG_OPTIONS } from './ui/rangeHud.ts'
-import type { AimMode, AimSel } from './ui/rangeHud.ts'
+import { createRangeHud } from './ui/rangeHud.ts'
+import type { AimSel } from './ui/rangeHud.ts'
 import { createRotateControl } from './ui/rotateControl.ts'
 import { createCollectionPanel } from './ui/collectionPanel.ts'
 
@@ -85,6 +81,7 @@ scene.add(editRoot)
 
 // 사격장
 const range = new RangeController()
+const rangeSession = new RangeSession()
 range.group.visible = false
 scene.add(range.group)
 
@@ -115,25 +112,11 @@ function applyRotation(editMode: boolean): void {
 // ─── 상태 ───────────────────────────────────────────────────
 let save: SavedGame = loadSave(Date.now())
 let active: Blaster = pickActive(save)
+const editor = new EditorSession(active)
 let station: StationId = 'workshop'
 let booted = false
 let editBuilt: BuiltBlaster | null = null
 let vmBuilt: BuiltBlaster | null = null
-const undoStack: PartsSnapshot[] = []
-// paint 포함 — 파츠 제거 후 되돌리기 시 색칠이 기본색으로 리셋되던 버그(QA) 방지.
-// (기존 파츠가 살아있는 분기는 현재 paint 를 유지 = "색칠은 undo 대상 아님" 규칙 그대로)
-type PartsSnapshot = Partial<
-  Record<SlotType, { partId: string; morph: MorphState; paint: PartPaint }>
->
-
-function clonePaint(p: PartPaint): PartPaint {
-  const out: PartPaint = {}
-  for (const zone of ['primary', 'secondary', 'accent'] as const) {
-    const zp = p[zone]
-    if (zp) out[zone] = { color: zp.color, finish: zp.finish }
-  }
-  return out
-}
 
 function pickActive(s: SavedGame): Blaster {
   return s.blasters.find((b) => b.id === s.activeBlasterId) ?? s.blasters[0]!
@@ -206,8 +189,12 @@ function fitViewmodel(g: THREE.Object3D): void {
   const bodyId = active.parts.body?.partId
   const gripId = active.parts.grip?.partId
   const magId = active.parts.magazine?.partId
-  const isFullMinigun = bodyId === 'body_minigun' && gripId === 'grip_minigun'
-  const hasRevolver = gripId === 'grip_revolver' || magId === 'mag_revolver'
+  const isFullMinigun =
+    CATALOG.get(bodyId ?? '')?.capabilities?.viewmodelFit === 'oversize' &&
+    CATALOG.get(gripId ?? '')?.capabilities?.viewmodelFit === 'oversize'
+  const hasRevolver = [gripId, magId].some(
+    (id) => CATALOG.get(id ?? '')?.capabilities?.viewmodelFit === 'compact',
+  )
   if (isFullMinigun) {
     g.updateMatrixWorld(true)
     _vmBox.setFromObject(g)
@@ -237,10 +224,10 @@ function rebuildViewmodel(): void {
 function refreshPanels(): void {
   const stats = computeStats(active)
   workshopPanel.setBlaster(active, stats)
-  paintPanel?.setBlaster(active)
+  paintPanel?.setBlaster(active, currentPaintZones())
   collectionPanel.setData(save.blasters, active.id)
   stationBar.setName(active.name)
-  stationBar.setCanUndo(undoStack.length > 0)
+  stationBar.setCanUndo(editor.canUndo)
 }
 
 // ─── 스테이션 전환 ─────────────────────────────────────────
@@ -250,26 +237,25 @@ function setStation(id: StationId): void {
   if (booted && id === station) return
   booted = true
   station = id
-  morphGesture = null // 스테이션 전환 — 진행 중 제스처 스냅샷 폐기
+  editor.cancelGesture()
   stationBar.setActive(id)
   autosave()
 
-  const editMode = id === 'workshop' || id === 'paint' || id === 'collection'
-  app.classList.toggle('range-mode', id === 'range')
+  const stationDef = STATION_DEFS[id]
+  const editMode = stationDef.mode === 'edit'
+  app.classList.toggle('range-mode', stationDef.mode === 'range')
   editRoot.visible = editMode
-  range.group.visible = id === 'range'
-  viewmodel.visible = id === 'range'
+  range.group.visible = stationDef.mode === 'range'
+  viewmodel.visible = stationDef.mode === 'range'
   controls.enabled = editMode
   applyRotation(editMode)
   editOverlay.style.display = editMode ? '' : 'none'
 
   panelHost.style.display = editMode ? '' : 'none'
-  hudHost.style.display = id === 'range' ? '' : 'none'
+  hudHost.style.display = stationDef.mode === 'range' ? '' : 'none'
 
   if (editMode) {
-    aimMode = 'none'
-    camera.fov = BASE_FOV
-    camera.updateProjectionMatrix()
+    rangeSession.selectAim(null, camera)
     camera.position.set(0.55, 0.34, 0.9)
     controls.target.set(0, 0.02, -0.05)
     controls.update()
@@ -281,9 +267,9 @@ function setStation(id: StationId): void {
         onApplyPreset: (i) => applyPreset(i),
       })
     }
-    wsRoot.style.display = id === 'workshop' ? '' : 'none'
-    paintRoot.style.display = id === 'paint' ? '' : 'none'
-    collectionRoot.style.display = id === 'collection' ? '' : 'none'
+    wsRoot.style.display = stationDef.panel === 'workshop' ? '' : 'none'
+    paintRoot.style.display = stationDef.panel === 'paint' ? '' : 'none'
+    collectionRoot.style.display = stationDef.panel === 'collection' ? '' : 'none'
     rebuildEdit('full')
     refreshPanels()
   } else {
@@ -315,8 +301,7 @@ function openBlaster(id: string, goto?: StationId): void {
   if (b.id !== active.id) {
     active = b
     save.activeBlasterId = id
-    undoStack.length = 0
-    morphGesture = null // 블래스터 전환 — 이전 gesture 스냅샷 폐기
+    editor.setActive(active)
   }
   sfx.click()
   autosave()
@@ -335,8 +320,7 @@ function duplicateBlaster(id: string): void {
   save.blasters.push(copy)
   active = copy
   save.activeBlasterId = copy.id
-  undoStack.length = 0
-  morphGesture = null
+  editor.setActive(active)
   sfx.snap()
   rebuildEdit('full')
   refreshPanels()
@@ -376,6 +360,7 @@ function importBackup(file: File): void {
       showToast('백업 파일을 읽지 못했어요')
       return
     }
+    save = res.save
     persistSave(save)
     refreshPanels()
     sfx.star()
@@ -394,8 +379,7 @@ function deleteBlaster(id: string): void {
   if (wasActive) {
     active = save.blasters[0]!
     save.activeBlasterId = active.id
-    undoStack.length = 0
-    morphGesture = null
+    editor.setActive(active)
     rebuildEdit('full')
   }
   sfx.click()
@@ -403,298 +387,104 @@ function deleteBlaster(id: string): void {
   autosave()
 }
 
-// ─── 파츠 선택 ─────────────────────────────────────────────
-function selectPart(slot: SlotType, partId: string | null): void {
-  const prev = active.parts[slot]
-  // 변화 없으면 무시 — 같은 파츠 재선택으로 morph 를 지우거나 빈 undo 를 쌓지 않는다
-  if (partId === null && !prev) return
-  if (partId !== null && prev?.partId === partId) return
-  morphGesture = null // 중단된 슬라이더 제스처가 이 변경까지 묶어 되감지 않게
-  pushUndo()
-  if (partId === null) {
-    if (slot !== 'body') delete active.parts[slot]
-  } else {
-    const inst = makeInstance(partId)
-    if (prev) inst.paint = prev.paint // 페인트 보존
-    active.parts[slot] = inst
-  }
-  sfx.snap()
+// ─── 편집 세션 배선 ─────────────────────────────────────────
+function finishEditorChange(sound: 'snap' | 'click'): void {
+  sfx[sound]()
   rebuildEdit('full')
   refreshPanels()
   autosave()
 }
 
-// ─── 자유 변형 ─────────────────────────────────────────────
-let morphGesture: PartsSnapshot | null = null
-let lastMorphSfx = 0
-let morphDirty = false // 드래그 중 재빌드를 프레임당 1회로 코얼레싱
+function currentPaintZones(): Partial<Record<SlotType, readonly ZoneId[]>> {
+  const result: Partial<Record<SlotType, readonly ZoneId[]>> = {}
+  if (!editBuilt) return result
+  for (const slot of Object.keys(editBuilt.parts) as SlotType[]) {
+    const built = editBuilt.parts[slot]
+    if (built) result[slot] = paintableZones(built)
+  }
+  return result
+}
+
+function selectPart(slot: SlotType, partId: string | null): void {
+  if (editor.selectPart(slot, partId)) finishEditorChange('snap')
+}
 
 function morphInput(slot: SlotType, key: MorphKey, t: number): void {
-  const inst = active.parts[slot]
-  if (!inst) return
-  if (!morphGesture) morphGesture = captureSnapshot()
-  inst.morph = { ...inst.morph, [key]: t }
-  // 재빌드는 프레임당 1회로 코얼레싱 — input 이벤트마다 전체 지오메트리를
-  // 재생성하면(초당 수십 회 × 12~20 BufferGeometry) 저사양에서 GC 스터터.
-  morphDirty = true
+  const result = editor.morphInput(slot, key, t)
+  if (!result.changed) return
   workshopPanel.updateStats(computeStats(active))
-  const now = performance.now()
-  if (now - lastMorphSfx > 80) {
-    sfx.morph(t)
-    lastMorphSfx = now
-  }
+  if (result.playSound) sfx.morph(t)
 }
 
 function morphCommit(slot: SlotType, key: MorphKey, t: number): void {
-  const inst = active.parts[slot]
-  if (!inst) return
-  inst.morph = { ...inst.morph, [key]: t }
-  morphDirty = false // 아래 full 재빌드가 대신한다
-  if (morphGesture) {
-    undoStack.push(morphGesture)
-    trimUndo()
-    morphGesture = null
-  }
-  sfx.snap()
-  rebuildEdit('full')
-  refreshPanels()
-  autosave()
-}
-
-function randomMorphFor(arche: string): MorphState {
-  const m: MorphState = {}
-  for (const p of MORPH_PARAMS) {
-    if (p.archetype !== arche) continue
-    // 장식은 절반 확률로만 켠다 — 늘 만땅이면 다양성이 오히려 죽는다
-    if (p.group === 'deco' && Math.random() < 0.5) continue
-    if (p.discrete) {
-      // 정수 스텝 전역([0,1] 양끝 포함)에서 뽑기 — 미니건(6) 등 극단값도 나오게
-      const steps = Math.max(1, p.max - p.min)
-      m[p.key] = Math.round(Math.random() * steps) / steps
-    } else {
-      m[p.key] = 0.1 + Math.random() * 0.8
-    }
-  }
-  return m
+  if (editor.morphCommit(slot, key, t)) finishEditorChange('snap')
 }
 
 function randomizeSlot(slot: SlotType): void {
-  const inst = active.parts[slot]
-  if (!inst) return
-  const arche = archetypeForSlot(slot)
-  if (!arche) return // 가드를 pushUndo 앞으로 — 빈 undo 엔트리 방지
-  morphGesture = null
-  pushUndo()
-  inst.morph = randomMorphFor(arche)
-  sfx.snap()
-  rebuildEdit('full')
-  refreshPanels()
-  autosave()
+  if (editor.randomizeSlot(slot)) finishEditorChange('snap')
 }
 
-function pick<T>(arr: readonly T[]): T {
-  return arr[Math.floor(Math.random() * arr.length)]!
-}
-
-/** 완전 랜덤 — 파츠·모양·장식·색까지 전부 새로 뽑는다. */
 function randomizeAll(): void {
-  morphGesture = null
-  pushUndo()
-  const primaryKeys = ALL_PALETTE_KEYS.filter(canBePrimary)
-  const randomPaint = (): PartPaint => ({
-    primary: { color: pick(primaryKeys), finish: pick(FINISHES) },
-    secondary: { color: pick(ALL_PALETTE_KEYS), finish: pick(FINISHES) },
-    accent: { color: pick(ALL_PALETTE_KEYS), finish: pick(FINISHES) },
-  })
-  const next: Blaster['parts'] = {}
-  // 몸통은 필수, 나머지는 확률적으로 (없는 것도 하나의 변형)
-  const bodyId = pick(partsForSlot('body')).id
-  next.body = { partId: bodyId, paint: randomPaint(), morph: randomMorphFor('body') }
-  for (const slot of ['barrel', 'magazine', 'sight', 'grip', 'stock', 'strap', 'muzzle'] as SlotType[]) {
-    const opts = partsForSlot(slot)
-    if (opts.length === 0) continue
-    if (Math.random() < 0.22) continue // 가끔은 비워 둔다
-    next[slot] = {
-      partId: pick(opts).id,
-      paint: randomPaint(),
-      morph: randomMorphFor(archetypeForSlot(slot) ?? 'body'),
-    }
-  }
-  active.parts = next
-  sfx.snap()
+  if (editor.randomizeAll()) finishEditorChange('snap')
+}
+
+function pickColor(
+  slot: SlotType,
+  zone: 'primary' | 'secondary' | 'accent',
+  color: import('./game/palette.ts').PaletteKey,
+): void {
+  if (!editor.pickColor(slot, zone, color)) return
+  sfx.click()
   rebuildEdit('full')
-  refreshPanels()
+  paintPanel?.setBlaster(active, currentPaintZones())
   autosave()
 }
 
-// ─── 색칠 ──────────────────────────────────────────────────
-function pickColor(slot: SlotType, zone: 'primary' | 'secondary' | 'accent', color: import('./game/palette.ts').PaletteKey): void {
-  const inst = active.parts[slot]
-  if (!inst) return
-  const finish = inst.paint[zone]?.finish ?? 'gloss'
-  inst.paint[zone] = { color, finish }
+function pickFinish(
+  slot: SlotType,
+  zone: 'primary' | 'secondary' | 'accent',
+  finish: 'matte' | 'gloss' | 'metal',
+): void {
+  if (!editor.pickFinish(slot, zone, finish)) return
   sfx.click()
   rebuildEdit('full')
-  paintPanel?.setBlaster(active)
-  autosave()
-}
-
-function pickFinish(slot: SlotType, zone: 'primary' | 'secondary' | 'accent', finish: 'matte' | 'gloss' | 'metal'): void {
-  const inst = active.parts[slot]
-  if (!inst) return
-  const color = inst.paint[zone]?.color ?? 'blasterBlue'
-  inst.paint[zone] = { color, finish }
-  sfx.click()
-  rebuildEdit('full')
-  paintPanel?.setBlaster(active)
+  paintPanel?.setBlaster(active, currentPaintZones())
   autosave()
 }
 
 function applyPreset(index: number): void {
-  const preset = PRESETS[index]
-  if (!preset) return
-  for (const slot of Object.keys(active.parts) as SlotType[]) {
-    const inst = active.parts[slot]
-    if (!inst) continue
-    PRESET_ZONE_ORDER.forEach((zone, ki) => {
-      const cur = inst.paint[zone]
-      if (cur) inst.paint[zone] = { color: preset.keys[ki]!, finish: cur.finish }
-    })
-  }
+  if (!editor.applyPreset(index)) return
   sfx.click()
   rebuildEdit('full')
-  paintPanel?.setBlaster(active)
+  paintPanel?.setBlaster(active, currentPaintZones())
   autosave()
-}
-
-// ─── Undo (조립+변형 통합 — 결정문 15) ───────────────────────
-function captureSnapshot(): PartsSnapshot {
-  const snap: PartsSnapshot = {}
-  for (const slot of Object.keys(active.parts) as SlotType[]) {
-    const inst = active.parts[slot]
-    if (inst) {
-      snap[slot] = {
-        partId: inst.partId,
-        morph: { ...inst.morph },
-        paint: clonePaint(inst.paint), // 제거→undo 시 색 복원용
-      }
-    }
-  }
-  return snap
-}
-
-function pushUndo(): void {
-  undoStack.push(captureSnapshot())
-  trimUndo()
-}
-
-function trimUndo(): void {
-  while (undoStack.length > 30) undoStack.shift()
 }
 
 function doUndo(): void {
-  const snap = undoStack.pop()
-  if (!snap) return
-  morphGesture = null // 진행 중 제스처 스냅샷 폐기(오염 방지)
-  const nextSlots = new Set(Object.keys(snap) as SlotType[])
-  for (const slot of Object.keys(active.parts) as SlotType[]) {
-    if (!nextSlots.has(slot) && slot !== 'body') delete active.parts[slot]
-  }
-  for (const slot of nextSlots) {
-    const s = snap[slot]!
-    const cur = active.parts[slot]
-    if (cur) {
-      // 살아있는 파츠: paint 는 현재값 보존 (결정문 15 — 색칠은 undo 대상 아님)
-      cur.partId = s.partId
-      cur.morph = { ...s.morph }
-    } else {
-      // 제거됐던 파츠 복원: 스냅샷의 paint 를 되살린다 (기본색 리셋 버그 수정)
-      const inst = makeInstance(s.partId, s.morph)
-      inst.paint = clonePaint(s.paint)
-      active.parts[slot] = inst
-    }
-  }
-  sfx.click()
-  rebuildEdit('full')
-  refreshPanels()
-  autosave()
+  if (editor.undo()) finishEditorChange('click')
 }
 
 // ─── 사격장 ────────────────────────────────────────────────
-let aimYaw = 0
-let aimPitch = 0
-let recoilPitch = 0
-let totalHits = 0 // 풍선 + 과녁 (과녁 명중이 0 반영되던 버그 수정)
-let shotsFired = 0
-// ── 탄창(다트 팩) — 탄창 장착 시만 유한. ammoMax<=0 = 무한(탄창 없음) ──
-let ammoMax = 0
-let ammoCur = 0
-let reloading = false
-let reloadDurMs = 0
-let reloadEndT = 0
-let guideSpeed = 30
-let guideGravity = 4
-let recoilRecovery = (8 * Math.PI) / 180 // rad/s — enterRange 에서 총별로 캐시
-const RECOIL_MAX_RAD = (RECOIL_MAX_DEG * Math.PI) / 180
-const _gDir = new THREE.Vector3()
-const _gOrigin = new THREE.Vector3()
-const FINISHES: readonly ('matte' | 'gloss' | 'metal')[] = ['matte', 'gloss', 'metal']
 const COURSE_ID = 'balloon_yard'
-// 00_DECISIONS: ★1=완주(1발+), ★2=명중 6+, ★3=명중 9 (아이 친화 — 결과는 항상 플러스)
-const STAR_CUTS: [number, number, number] = [1, 6, 9]
 
-// ─── 조준 모드: 일반 · 레드도트(저배율) · 망원 스코프(4~15배) ──
-const BASE_FOV = 45
-const ZOOM_MIN = 4
-const ZOOM_MAX = 15
-const REDDOT_MAG = 1.5 // 레드도트 저배율 — "배율은 높지 않지만" 빨간 점 조준
-let aimMode: AimMode = 'none'
-let zoom = ZOOM_MIN
-
-/** 배율 z 에 대한 광학적 FOV(도). z=1 이면 BASE_FOV. */
-function fovForZoom(z: number): number {
-  const half = (BASE_FOV / 2) * (Math.PI / 180)
-  return (2 * Math.atan(Math.tan(half) / z) * 180) / Math.PI
+function currentShotProfile() {
+  const stats = computeStats(active)
+  const bore = boreScaleFromMorph(active.parts.barrel?.morph ?? {})
+  return { stats, profile: toShotProfile(stats, bore) }
 }
 
-function currentMag(): number {
-  return aimMode === 'scope' ? zoom : aimMode === 'reddot' ? REDDOT_MAG : 1
-}
-
-function applyView(): void {
-  camera.fov = fovForZoom(currentMag())
-  camera.updateProjectionMatrix()
-}
-
-/** 조준 선택 — null=일반 · 'reddot'=레드도트 · 4~15=망원 스코프. */
-function selectMag(sel: AimSel): void {
-  if (sel === null) {
-    aimMode = 'none'
-  } else if (sel === 'reddot') {
-    aimMode = 'reddot'
-  } else {
-    aimMode = 'scope'
-    zoom = Math.max(ZOOM_MIN, Math.min(ZOOM_MAX, Math.round(sel)))
-  }
-  applyView()
-  rangeHud.setMagSelection(aimMode, zoom)
-  sfx.click()
-}
-
-// 휠 편의 — 선택지(일반→레드도트→4…15배)를 한 칸씩 이동
-const AIM_ORDER: AimSel[] = [null, 'reddot', ...MAG_OPTIONS]
-function stepMag(delta: number): void {
-  const cur: AimSel = aimMode === 'none' ? null : aimMode === 'reddot' ? 'reddot' : zoom
-  let i = AIM_ORDER.findIndex((s) => s === cur)
-  if (i < 0) i = 0
-  i = Math.max(0, Math.min(AIM_ORDER.length - 1, i + delta))
-  selectMag(AIM_ORDER[i] ?? null)
+function syncAmmo(progress?: number): void {
+  rangeHud.setAmmo(
+    rangeSession.ammoCur,
+    rangeSession.ammoMax,
+    rangeSession.reloading,
+    progress,
+  )
 }
 
 range.onHit = (e) => {
-  // 풍선·과녁 모두 명중으로 센다 (과녁만 맞히면 "맞힌 개수 0" 이던 버그 수정)
-  totalHits += 1
-  rangeHud.setHits(totalHits)
+  const hits = rangeSession.registerHit()
+  rangeHud.setHits(hits)
   sfx.pop()
   const sp = worldToScreen(e.x, e.y, e.z)
   if (sp) rangeHud.popNumber(e.points, sp.x, sp.y)
@@ -703,136 +493,63 @@ range.onHit = (e) => {
 function enterRange(): void {
   panelHost.style.display = 'none'
   hudHost.style.display = ''
-  totalHits = 0
-  shotsFired = 0
   range.reset()
   rangeHud.setHits(0)
   rangeHud.hideResult()
-  aimYaw = 0
-  aimPitch = 0
-  recoilPitch = 0
-  aimMode = 'none'
-  zoom = ZOOM_MIN
-  applyView()
-  rangeHud.setMagSelection('none', zoom)
   camera.position.set(0, 1.5, 0.2)
-  composeAim()
-  rebuildViewmodel()
-  stationBar.setCanUndo(false) // 사격 중 되돌리기 잠금 — 뷰모델·스프레드 미갱신 불일치 방지
-  const stats = computeStats(active)
-  const bore = boreScaleFromMorph(active.parts.barrel?.morph ?? {})
-  const profile = toShotProfile(stats, bore)
+  const { stats, profile } = currentShotProfile()
+  rangeSession.begin(stats, profile, camera)
+  rangeHud.setMagSelection(rangeSession.aimMode, rangeSession.zoom)
   rangeHud.setSpread(profile.spreadDeg)
-  guideSpeed = profile.muzzleVelocity
-  guideGravity = PROJECTILE_GRAVITY[profile.kind]
-  // 설계 복귀율(8~14°/s)을 실제로 배선 — 하드코딩 126°/s 라 반동이 안 보이던 버그 수정
-  recoilRecovery = (recoveryDegPerSec(profile) * Math.PI) / 180
-  // 탄창 장착 시 유한 탄약·재장전, 없으면 무한 (stats.capacity 0 = 무한)
-  ammoMax = stats.capacity
-  ammoCur = ammoMax
-  reloading = false
-  reloadDurMs = Math.max(0, stats.reloadSec) * 1000
-  reloadEndT = 0
-  rangeHud.setAmmo(ammoCur, ammoMax, false)
+  syncAmmo()
+  rebuildViewmodel()
+  stationBar.setCanUndo(false)
 }
 
-/** 재장전 시작 — 탄창 있고, 아직 안 하는 중이고, 꽉 차지 않았을 때만. */
 function startReload(): void {
-  if (ammoMax <= 0 || reloading || ammoCur >= ammoMax) return
-  reloading = true
-  reloadEndT = performance.now() + reloadDurMs
-  rangeHud.setAmmo(ammoCur, ammoMax, true, 0)
+  if (!rangeSession.startReload(performance.now())) return
+  syncAmmo(0)
   sfx.reload()
 }
 
-const _aimEuler = new THREE.Euler(0, 0, 0, 'YXZ')
-function composeAim(): void {
-  _aimEuler.set(aimPitch + recoilPitch, aimYaw, 0, 'YXZ')
-  camera.quaternion.setFromEuler(_aimEuler)
+function selectMag(sel: AimSel): void {
+  rangeSession.selectAim(sel, camera)
+  rangeHud.setMagSelection(rangeSession.aimMode, rangeSession.zoom)
+  sfx.click()
 }
 
-const _fireRight = new THREE.Vector3()
-const _fireUp = new THREE.Vector3()
-const _fireDir = new THREE.Vector3()
+function stepMag(delta: number): void {
+  rangeSession.stepAim(delta, camera)
+  rangeHud.setMagSelection(rangeSession.aimMode, rangeSession.zoom)
+  sfx.click()
+}
+
 function fire(): void {
-  // 재장전 중엔 발사 불가
-  if (reloading) return
-  // 총구가 몇 개든 총알은 항상 1발 (사용자 요청). 총구 개수는 연사(computeStats)·모양에만 반영.
-  const count = 1
-  // 탄창 장착 시: 남은 탄만큼만 발사. 비어 있으면 재장전 시작하고 이번 발사는 건너뜀
-  let shots = count
-  if (ammoMax > 0) {
-    if (ammoCur <= 0) {
-      sfx.empty()
-      startReload()
-      return
-    }
-    shots = Math.min(count, ammoCur)
-  }
-  const stats = computeStats(active)
-  const bore = boreScaleFromMorph(active.parts.barrel?.morph ?? {})
-  const profile = toShotProfile(stats, bore)
-  const dir = new THREE.Vector3()
-  camera.getWorldDirection(dir)
-  const origin = camera.position.clone().addScaledVector(dir, 0.5)
-  // 항상 1발만 발사 (shots===1). 총구가 많아도 총알은 한 개.
-  _fireRight.crossVectors(dir, camera.up).normalize()
-  _fireUp.crossVectors(_fireRight, dir).normalize()
-  for (let i = 0; i < shots; i++) {
-    const off = shots === 1 ? 0 : (i / (shots - 1) - 0.5) * 2 // -1..1
-    const fan = 0.03 // 퍼짐 반경(rad)
-    _fireDir
-      .copy(dir)
-      .addScaledVector(_fireRight, off * fan)
-      .addScaledVector(_fireUp, (shots > 2 ? Math.sin(i) * 0.4 : 0) * fan)
-      .normalize()
-    range.fireOne(profile, origin, _fireDir)
-  }
-  shotsFired += 1
-  // 탄약 차감 후 비면 자동 재장전
-  if (ammoMax > 0) {
-    ammoCur -= shots
-    rangeHud.setAmmo(ammoCur, ammoMax, false)
-    if (ammoCur <= 0) startReload()
-  }
-  // 누적 상한 클램프 (설계 RECOIL_MAX_DEG) — 느린 복귀와 짝. 다발이면 반동 약간↑(상한 내)
-  recoilPitch = Math.min(
-    recoilPitch + (profile.recoilKickDeg * Math.PI * (1 + (shots - 1) * 0.15)) / 180,
-    RECOIL_MAX_RAD,
-  )
-  sfx.shoot()
+  const { profile } = currentShotProfile()
+  const result = rangeSession.fire(profile, camera, range, performance.now())
+  if (result.status === 'blocked') return
+  if (result.status === 'empty') sfx.empty()
+  if (result.startedReload) sfx.reload()
+  syncAmmo(result.startedReload ? 0 : undefined)
+  if (result.status === 'fired') sfx.shoot()
 }
 
 function finishRange(): void {
-  const stars = starsFor(totalHits)
+  const stars = rangeSession.stars
   updateCourseRecord(stars)
-  // 한 발이라도 쐈으면 항상 결과 카드 — 0명중이어도 격려("다시 해볼까요?").
-  // 아예 안 쏘고 나가면 모달 없이 바로 공방(불필요한 마찰 제거).
-  if (shotsFired > 0) {
+  if (rangeSession.shotsFired > 0) {
     if (stars > 0) sfx.star()
-    rangeHud.showResult(stars, totalHits)
+    rangeHud.showResult(stars, rangeSession.hits)
   } else {
     setStation('workshop')
   }
 }
 
 function retryRange(): void {
-  totalHits = 0
-  shotsFired = 0
+  rangeSession.retry()
   range.reset()
   rangeHud.setHits(0)
-  // 탄약도 가득 채우고 재장전 상태 해제
-  ammoCur = ammoMax
-  reloading = false
-  reloadEndT = 0
-  rangeHud.setAmmo(ammoCur, ammoMax, false)
-}
-
-function starsFor(hits: number): 0 | 1 | 2 | 3 {
-  if (hits >= STAR_CUTS[2]) return 3
-  if (hits >= STAR_CUTS[1]) return 2
-  if (hits >= STAR_CUTS[0]) return 1
-  return 0
+  syncAmmo()
 }
 
 function updateCourseRecord(stars: 0 | 1 | 2 | 3): void {
@@ -840,7 +557,7 @@ function updateCourseRecord(stars: 0 | 1 | 2 | 3): void {
   const best = Math.max(prev?.stars ?? 0, stars) as 0 | 1 | 2 | 3
   save.courseRecords[COURSE_ID] = {
     stars: best,
-    bestScore: Math.max(prev?.bestScore ?? 0, totalHits),
+    bestScore: Math.max(prev?.bestScore ?? 0, rangeSession.hits),
     bestBlasterId: active.id,
   }
   autosave()
@@ -868,17 +585,12 @@ renderer.domElement.addEventListener('pointermove', (ev) => {
   const dx = ev.clientX - downX
   const dy = ev.clientY - downY
   moved = Math.max(moved, Math.hypot(dx, dy))
-  // 조준 배율만큼 감도를 낮춰 정밀 조준 (fov 비례 — 일반 1.0, 레드도트 약간, 스코프 크게)
-  const sens = 0.0032 * (fovForZoom(currentMag()) / BASE_FOV)
   // movementX 미제공 브라우저(일부 터치)를 위해 client 델타 폴백 — 마우스도 동일 결과
   const mx = ev.movementX || ev.clientX - lastX
   const my = ev.movementY || ev.clientY - lastY
   lastX = ev.clientX
   lastY = ev.clientY
-  aimYaw -= mx * sens
-  aimPitch -= my * sens
-  aimPitch = Math.max(-0.5, Math.min(0.45, aimPitch))
-  composeAim()
+  rangeSession.moveAim(mx, my, camera)
 })
 window.addEventListener('pointerup', () => {
   if (station !== 'range' || !pointerDown) return
@@ -898,7 +610,7 @@ renderer.domElement.addEventListener(
 renderer.domElement.addEventListener('contextmenu', (ev) => {
   if (station !== 'range') return
   ev.preventDefault()
-  selectMag(aimMode === 'none' ? 'reddot' : null)
+  selectMag(rangeSession.aimMode === 'none' ? 'reddot' : null)
 })
 // R 키 = 수동 재장전 (다 쓰기 전에 미리 갈아끼우기)
 window.addEventListener('keydown', (ev) => {
@@ -915,32 +627,16 @@ function tick(): void {
   const dt = Math.min(0.05, (now - lastT) / 1000)
   lastT = now
   if (station === 'range') {
-    if (recoilPitch > 0) {
-      // 설계 복귀율(8~14°/s) — 하드코딩 2.2rad/s(=126°/s)는 킥을 렌더 전에 지워버렸다
-      recoilPitch = Math.max(0, recoilPitch - dt * recoilRecovery)
-      composeAim()
+    const result = rangeSession.update(dt, now, camera, range)
+    if (result.reloadCompleted) {
+      syncAmmo()
+      sfx.reloadDone()
+    } else if (result.reloadProgress !== null) {
+      syncAmmo(result.reloadProgress)
     }
-    // 재장전 진행/완료
-    if (reloading) {
-      if (now >= reloadEndT) {
-        reloading = false
-        ammoCur = ammoMax
-        rangeHud.setAmmo(ammoCur, ammoMax, false)
-        sfx.reloadDone()
-      } else {
-        const frac = reloadDurMs > 0 ? 1 - (reloadEndT - now) / reloadDurMs : 1
-        rangeHud.setAmmo(ammoCur, ammoMax, true, frac)
-      }
-    }
-    // 조준 궤적 가이드 갱신 (현재 조준 방향)
-    camera.getWorldDirection(_gDir)
-    _gOrigin.copy(camera.position).addScaledVector(_gDir, 0.5)
-    range.updateGuide(_gOrigin, _gDir, guideSpeed, guideGravity)
-    range.update(dt, performance.now())
   } else {
     // 드래그 중 쌓인 morph 변경을 프레임당 1회만 재빌드 (코얼레싱)
-    if (morphDirty) {
-      morphDirty = false
+    if (editor.consumeMorphDirty()) {
       rebuildEdit('drag')
     }
     controls.update()
@@ -994,13 +690,11 @@ tick()
   }),
   setStation,
   setAim: (yaw: number, pitch: number) => {
-    aimYaw = yaw
-    aimPitch = pitch
-    composeAim()
+    rangeSession.setAim(yaw, pitch, camera)
   },
-  hits: () => totalHits,
+  hits: () => rangeSession.hits,
   selectMag: (sel: AimSel) => selectMag(sel),
-  zoomState: () => ({ aimMode, zoom, fov: Math.round(camera.fov * 100) / 100 }),
+  zoomState: () => ({ aimMode: rangeSession.aimMode, zoom: rangeSession.zoom, fov: Math.round(camera.fov * 100) / 100 }),
   rotateState: () => ({
     mul: rotateSpeedMul,
     autoRotate: controls.autoRotate,
@@ -1011,23 +705,24 @@ tick()
     for (let i = 0; i < n; i++) {
       if (station === 'range') {
         const now = performance.now()
-        if (reloading && now >= reloadEndT) {
-          reloading = false
-          ammoCur = ammoMax
-          rangeHud.setAmmo(ammoCur, ammoMax, false)
-        }
-        range.update(1 / 60, now)
+        const result = rangeSession.update(1 / 60, now, camera, range)
+        if (result.reloadCompleted) syncAmmo()
       }
       renderer.render(scene, camera)
     }
-    return { calls: renderer.info.render.calls, hits: totalHits }
+    return { calls: renderer.info.render.calls, hits: rangeSession.hits }
   },
-  ammoState: () => ({ ammoMax, ammoCur, reloading, reloadDurMs }),
+  ammoState: () => ({
+    ammoMax: rangeSession.ammoMax,
+    ammoCur: rangeSession.ammoCur,
+    reloading: rangeSession.reloading,
+    reloadDurMs: rangeSession.reloadDurMs,
+  }),
   reload: () => startReload(),
   state: () => ({
     station,
-    recoilDeg: Math.round(((recoilPitch * 180) / Math.PI) * 1000) / 1000,
-    recoilRecoveryDegPerSec: Math.round(((recoilRecovery * 180) / Math.PI) * 10) / 10,
+    recoilDeg: Math.round(rangeSession.recoilDeg * 1000) / 1000,
+    recoilRecoveryDegPerSec: Math.round(rangeSession.recoilRecoveryDegPerSec * 10) / 10,
     frameCount,
     editVisible: editRoot.visible,
     rangeVisible: range.group.visible,

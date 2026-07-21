@@ -1,9 +1,11 @@
 // src/ui/rangeHud.ts — 사격장 HUD: 조준점·명중 수·결과 별 (leaf).
 import { resultStars } from './stars.ts'
+import { MAG_OPTIONS } from '../game/rangeSession.ts'
+import type { AimMode, AimSelection } from '../game/rangeSession.ts'
 
 /** 조준 선택: null=일반(맨눈) · 'reddot'=레드도트(저배율+빨간점) · 4~15=망원 스코프 배율. */
-export type AimSel = number | 'reddot' | null
-export type AimMode = 'none' | 'reddot' | 'scope'
+export type AimSel = AimSelection
+export type { AimMode } from '../game/rangeSession.ts'
 
 export interface RangeHudCallbacks {
   onBack: () => void // 상단 "공방으로" — 라운드 종료(결과 표시)
@@ -13,7 +15,7 @@ export interface RangeHudCallbacks {
 }
 
 /** 망원 스코프 배율 선택지 (4~15배). */
-export const MAG_OPTIONS: readonly number[] = [4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15]
+export { MAG_OPTIONS } from '../game/rangeSession.ts'
 
 export function createRangeHud(root: HTMLElement, cb: RangeHudCallbacks) {
   root.innerHTML = ''

@@ -3,6 +3,7 @@ import type {
   Blaster,
   BlasterStats,
   BodyDef,
+  CatalogPartDef,
   PartDef,
   PartId,
   ProjectileKind,
@@ -101,6 +102,7 @@ export const BODIES: readonly BodyDef[] = [
     nameKo: '미니건 코어',
     desc: '동그랗고 엄청나게 큰 왕구슬 프레임. 우람하고 든든해요',
     delta: {},
+    capabilities: { viewmodelFit: 'oversize' },
     base: { power: 8, fireRate: 5, accuracy: 3, weight: 9 },
     weightLimit: 18,
     sockets: ['barrel', 'sight', 'grip', 'stock', 'muzzle', 'magazine', 'strap'],
@@ -214,6 +216,7 @@ export const PARTS: readonly PartDef[] = [
     nameKo: '와이드 배럴',
     desc: '입구가 넓은 배럴. 큼직한 발사체가 나가요',
     delta: { power: 2, fireRate: -1, weight: 1 },
+    kind: 'gel',
   },
   {
     id: 'barrel_twin',
@@ -263,6 +266,7 @@ export const PARTS: readonly PartDef[] = [
     nameKo: '후크 튜브',
     desc: '짧고 넓은 종 모양의 탐험가 튜브',
     delta: { power: 2, fireRate: 2, accuracy: -2, weight: 1 },
+    kind: 'paint',
   },
   {
     id: 'barrel_racer',
@@ -316,6 +320,7 @@ export const PARTS: readonly PartDef[] = [
     delta: { accuracy: 1, weight: 1 },
     capacity: 6,
     reloadSec: 1.5,
+    capabilities: { viewmodelFit: 'compact' },
   },
   {
     id: 'mag_rocket',
@@ -447,6 +452,7 @@ export const PARTS: readonly PartDef[] = [
     nameKo: '미니건 손잡이',
     desc: '총 몸통 위에 얹는 커다란 스페이드 손잡이. 두 손으로 꽉!',
     delta: { accuracy: 1, weight: 1 },
+    capabilities: { mount: 'gripTop', viewmodelFit: 'oversize', hidesBodyCarryHandle: true },
   },
   {
     id: 'grip_revolver',
@@ -454,6 +460,7 @@ export const PARTS: readonly PartDef[] = [
     nameKo: '리볼버 그립',
     desc: '서부 총잡이처럼 뒤로 둥글게 말린 손잡이. 뒤꿈치가 통통!',
     delta: { accuracy: 1 },
+    capabilities: { viewmodelFit: 'compact' },
   },
   {
     id: 'grip_turbine',
@@ -629,7 +636,7 @@ export const PARTS: readonly PartDef[] = [
 ]
 
 // ─── 카탈로그 조회 ──────────────────────────────────────────
-export const CATALOG: ReadonlyMap<PartId, PartDef> = new Map<PartId, PartDef>(
+export const CATALOG: ReadonlyMap<PartId, CatalogPartDef> = new Map<PartId, CatalogPartDef>(
   [...BODIES, ...PARTS].map((p) => [p.id, p]),
 )
 
@@ -640,7 +647,7 @@ export const BODY_MAP: ReadonlyMap<PartId, BodyDef> = new Map<PartId, BodyDef>(
 /** M1 시작 세트 — 전 파츠 즉시 사용(자유로운 창작 우선, 별 해금은 후속 마일스톤). */
 export const STARTER_PART_IDS: readonly PartId[] = [...BODIES, ...PARTS].map((p) => p.id)
 
-export function partsForSlot(slot: SlotType): PartDef[] {
+export function partsForSlot(slot: SlotType): CatalogPartDef[] {
   if (slot === 'body') return [...BODIES]
   return PARTS.filter((p) => p.slot === slot)
 }
@@ -679,10 +686,10 @@ export function computeStats(blaster: Blaster): BlasterStats {
       fireRate += def.delta.fireRate ?? 0
       accuracy += def.delta.accuracy ?? 0
       weight += def.delta.weight ?? 0
-      if (slot === 'barrel' && def.kind) kind = def.kind
-      if (slot === 'magazine') {
-        capacity = def.capacity ?? capacity
-        reloadSec = def.reloadSec ?? reloadSec
+      if (def.slot === 'barrel' && def.kind) kind = def.kind
+      if (def.slot === 'magazine') {
+        capacity = def.capacity
+        reloadSec = def.reloadSec
       }
     }
     // morph 델타 (인스턴스별)

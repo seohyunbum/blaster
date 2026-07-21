@@ -1,19 +1,21 @@
 // src/ui/stationBar.ts — 상단 스테이션 탭(공방/꾸미기/사격장) + 되돌리기 (leaf).
 import { icoWorkshop, icoPaint, icoRange, icoUndo, icoCollection } from './icons.ts'
+import { STATION_DEFS, STATION_ORDER, type StationIcon } from '../game/definitions.ts'
+import type { StationId } from '../game/definitions.ts'
 
-export type StationId = 'workshop' | 'paint' | 'range' | 'collection'
+export type { StationId } from '../game/definitions.ts'
 
 export interface StationCallbacks {
   onStation: (id: StationId) => void
   onUndo: () => void
 }
 
-const STATIONS: { id: StationId; label: string; ico: () => string }[] = [
-  { id: 'workshop', label: '만들기', ico: icoWorkshop },
-  { id: 'paint', label: '꾸미기', ico: icoPaint },
-  { id: 'range', label: '쏘기', ico: icoRange },
-  { id: 'collection', label: '보관함', ico: icoCollection },
-]
+const ICONS: Record<StationIcon, () => string> = {
+  workshop: icoWorkshop,
+  paint: icoPaint,
+  range: icoRange,
+  collection: icoCollection,
+}
 
 export function createStationBar(root: HTMLElement, cb: StationCallbacks) {
   root.innerHTML = ''
@@ -35,13 +37,14 @@ export function createStationBar(root: HTMLElement, cb: StationCallbacks) {
   root.appendChild(nameEl)
 
   const buttons: { id: StationId; el: HTMLButtonElement }[] = []
-  for (const s of STATIONS) {
+  for (const id of STATION_ORDER) {
+    const s = STATION_DEFS[id]
     const b = document.createElement('button')
     b.className = 'station-tab'
-    b.innerHTML = `${s.ico()}<span>${s.label}</span>`
-    b.addEventListener('click', () => cb.onStation(s.id))
+    b.innerHTML = `${ICONS[s.icon]()}<span>${s.labelKo}</span>`
+    b.addEventListener('click', () => cb.onStation(id))
     tabsWrap.appendChild(b)
-    buttons.push({ id: s.id, el: b })
+    buttons.push({ id, el: b })
   }
 
   return {

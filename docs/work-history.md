@@ -238,3 +238,20 @@ fitViewmodel 의 리볼버 하강량 `position.y -0.08 → -0.05` (아주 살짝
 - **문서 정합화**: 00/02/03/07/08 정본에 76종 로스터·7계열 시각 레시피·현재 파츠당 14메시/완전 장착 56 draw call 보수적 상한·금칙어를 동기화.
 - **배포 표식**: index.html 버전 뱃지 8→9.
 - **최종 검증**: `npm run verify` 73/73 통과(typecheck 포함) + `npm run build` 성공. 인앱 브라우저에서 버전 9·코멧/터빈 풀세트·76종 목록 노출·완전 랜덤의 신규 포켓 팩 선택·새로고침 후 자동저장 복원을 확인. JS 오류 0(그래픽 드라이버 정밀도 warning 1건만, 렌더 정상).
+
+## 2026-07-22 — OOP·확장성 구조 개편 완료
+
+사용자 요청에 따라 OOP/SOLID·유지보수 관점 감사에서 제안한 순서를 동작 보존형으로 끝까지 적용했다.
+
+- **배포·구조 게이트**: Pages CI를 `npm run verify → build` 순서로 변경. `check-architecture.mjs`(leaf 역참조+main 850줄)와 `check-hotpaths.mjs`(tick/update/animate의 Three 할당)를 실제 verify 체인에 연결.
+- **단일 레지스트리**: `definitions.ts`에 8슬롯·4스테이션·3발사체의 라벨/모드/부착/morph/색칠/랜덤/물리/시각 정책을 통합. `budgets.ts`에 풀64·파츠14·완전장착56·씬300을 정본화.
+- **상태 캡슐화**: `EditorSession`이 파츠·morph 제스처·undo·랜덤·색칠을, `RangeSession`이 조준·탄약·재장전·반동·명중·별을 소유. `main.ts` 1,075→771줄.
+- **비주얼 Strategy 분리**: 1,590줄 `partVisuals.ts`를 typed registry 파사드와 슬롯별 `visuals/*Visuals.ts` 8개로 분리. 카탈로그 ID와 독립 시각 레시피 ID의 집합 일치를 테스트로 강제해 조용한 기본 외형 위장을 차단.
+- **도메인 타입·capability**: `PartDef`를 body/barrel/magazine/accessory discriminated union으로 강화. 특수 마운트·뷰모델 처리를 문자열 ID 비교 대신 capability 메타데이터로 이동.
+- **발사체 도달성**: `barrel_wide=gel`, `barrel_hook=paint`를 연결하고 종류별 중력·반경·속도 상한·색·메시·명중 이펙트를 레지스트리화. 전 종류가 실제 카탈로그에서 도달 가능한지 자동 검증.
+- **저장 경계**: `saveModel`·`SaveCodec`·`SaveRepository`·facade로 분리. storage/clock/id 생성기 주입, persist/import의 입력 객체 mutation 제거, 미등록 슬롯 차단. 저장 데이터 모양은 그대로라 `SAVE_VERSION=1` 유지.
+- **UI DIP 개선**: paintPanel의 assembly/Three 직접 의존을 제거하고 main이 기존 BuiltPart에서 색칠 존 view model을 전달.
+- **테스트 73→86개**: 슬롯·스테이션·발사체·ID 중복·카탈로그↔시각 완전성·동일-prefix 미등록 폴백·세션·저장소 불변성·풀 예산 테스트 추가.
+- **실패 기록**: 최초 세션/저장소 클래스에 TypeScript parameter property를 사용해 Node strip-only 테스트가 로드 단계에서 실패. 명시적 필드+생성자 대입으로 교체 후 전체 녹색.
+- **문서·배포 표식**: AGENTS/README/01/02/03/04/05/06/07/08/09의 4스테이션·3발사체·성능 예산·현재 모듈 구조를 동기화. 버전 배지 9→10.
+- **브라우저 QA**: 로컬 Vite에서 버전 10·8슬롯 탭·4스테이션을 확인. 보관함/꾸미기/사격장 전환, 색칠 존 표시, 레드도트 선택(active), 공방 복귀가 정상이고 브라우저 error 로그 0.

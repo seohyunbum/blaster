@@ -1,18 +1,15 @@
 // src/game/ballistics.ts — 스탯→발사 변환·탄도 순수 수학 (leaf, THREE 비의존 → 테스트 대상).
 // 이 파일의 ShotProfile 계약·클램프가 정본 (04 §2.2, 결정문 4).
 import type { BlasterStats, ProjectileKind, ShotProfile } from './types.ts'
+import { PROJECTILE_DEFS } from './definitions.ts'
 
 // kind 파생 상수 — 단일 소스 (04 §2.1). foam 은 00_DECISIONS R1 로 폐기.
-export const PROJECTILE_GRAVITY: Record<ProjectileKind, number> = {
-  dart: 4,
-  gel: 6,
-  paint: 14,
-}
-export const PROJECTILE_BASE_RADIUS: Record<ProjectileKind, number> = {
-  dart: 0.025,
-  gel: 0.035,
-  paint: 0.045,
-}
+export const PROJECTILE_GRAVITY: Record<ProjectileKind, number> = Object.fromEntries(
+  Object.entries(PROJECTILE_DEFS).map(([kind, def]) => [kind, def.gravity]),
+) as Record<ProjectileKind, number>
+export const PROJECTILE_BASE_RADIUS: Record<ProjectileKind, number> = Object.fromEntries(
+  Object.entries(PROJECTILE_DEFS).map(([kind, def]) => [kind, def.baseRadius]),
+) as Record<ProjectileKind, number>
 
 export function clamp(n: number, lo: number, hi: number): number {
   return n < lo ? lo : n > hi ? hi : n
@@ -33,7 +30,10 @@ export function toShotProfile(stats: BlasterStats, boreScale = 1): ShotProfile {
   const r = stats.fireRate
   const h = stats.handling
 
-  const muzzleVelocity = clamp(20 + ((p - 1) * 40) / 9, 20, 60)
+  const muzzleVelocity = Math.min(
+    clamp(20 + ((p - 1) * 40) / 9, 20, 60),
+    PROJECTILE_DEFS[stats.kind].maxSpeed,
+  )
   const spreadDeg = clamp(4.0 - ((a - 1) * 3.7) / 9, 0.3, 4.0)
   const fireIntervalMs = clamp(600 - (r - 1) * 50, 150, 600)
 

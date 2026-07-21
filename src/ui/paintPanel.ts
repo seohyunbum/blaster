@@ -1,8 +1,8 @@
 // src/ui/paintPanel.ts — 꾸미기 패널: 파츠·존 선택 + 팔레트 색칠 + 프리셋 (leaf).
 import type { Blaster, Finish, SlotType, ZoneId } from '../game/types.ts'
 import { ALL_PALETTE_KEYS, canBePrimary, TOY_PALETTE, type PaletteKey } from '../game/palette.ts'
-import { paintableZones } from '../game/assembly.ts'
 import { PRESETS } from '../game/presets.ts'
+import { PAINTABLE_SLOTS, SLOT_DEFS } from '../game/definitions.ts'
 
 export interface PaintCallbacks {
   onSelectPaintPart: (slot: SlotType) => void
@@ -10,6 +10,8 @@ export interface PaintCallbacks {
   onPickFinish: (slot: SlotType, zone: ZoneId, finish: Finish) => void
   onApplyPreset: (index: number) => void
 }
+
+export type PaintZonesBySlot = Partial<Record<SlotType, readonly ZoneId[]>>
 
 const ZONE_LABELS: { zone: ZoneId; label: string }[] = [
   { zone: 'primary', label: '본체색' },
@@ -29,6 +31,7 @@ export function createPaintPanel(root: HTMLElement, cb: PaintCallbacks) {
   let blaster: Blaster | null = null
   let activeSlot: SlotType = 'body'
   let activeZone: ZoneId = 'primary'
+  let zonesBySlot: PaintZonesBySlot = {}
 
   root.innerHTML = ''
   root.className = 'panel paint-panel'
@@ -69,27 +72,15 @@ export function createPaintPanel(root: HTMLElement, cb: PaintCallbacks) {
 
   function slotsOfBlaster(): SlotType[] {
     if (!blaster) return []
-    return (
-      ['body', 'barrel', 'magazine', 'sight', 'grip', 'stock', 'strap', 'muzzle'] as SlotType[]
-    ).filter((s) => blaster!.parts[s])
+    return PAINTABLE_SLOTS.filter((slot) => blaster!.parts[slot])
   }
 
   function renderPartTabs(): void {
     partTabs.innerHTML = ''
-    const names: Record<string, string> = {
-      body: '몸통',
-      barrel: '배럴',
-      magazine: '다트 팩',
-      sight: '조준기',
-      grip: '그립',
-      stock: '스톡',
-      strap: '어깨끈',
-      muzzle: '총구',
-    }
     for (const s of slotsOfBlaster()) {
       const b = document.createElement('button')
       b.className = 'slot-tab' + (s === activeSlot ? ' active' : '')
-      b.textContent = names[s] ?? s
+      b.textContent = SLOT_DEFS[s].labelKo
       b.addEventListener('click', () => {
         activeSlot = s
         activeZone = 'primary'
@@ -103,8 +94,7 @@ export function createPaintPanel(root: HTMLElement, cb: PaintCallbacks) {
   function renderZones(): void {
     zoneRow.innerHTML = ''
     if (!blaster) return
-    const inst = blaster.parts[activeSlot]
-    const zones = inst ? paintableZones(inst) : []
+    const zones = zonesBySlot[activeSlot] ?? []
     for (const z of ZONE_LABELS) {
       const b = document.createElement('button')
       const enabled = zones.includes(z.zone)
@@ -156,8 +146,9 @@ export function createPaintPanel(root: HTMLElement, cb: PaintCallbacks) {
   }
 
   return {
-    setBlaster(b: Blaster): void {
+    setBlaster(b: Blaster, paintZones: PaintZonesBySlot): void {
       blaster = b
+      zonesBySlot = paintZones
       if (!b.parts[activeSlot]) activeSlot = 'body'
       renderAll()
     },

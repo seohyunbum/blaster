@@ -7,7 +7,7 @@
 ## 실행
 
 - **아들용**: 바탕화면 **"블래스터 공방"** 아이콘 더블클릭 (콘솔 창이 뜨고 브라우저가 자동으로 열림. 다 놀면 콘솔 창을 닫기)
-- 개발: `npm run dev` (포트 5175) · 검증: `npm run verify` (typecheck + 단위 테스트)
+- 개발: `npm run dev` (포트 5175) · 검증: `npm run verify` (typecheck + 86개 테스트 + 아키텍처/핫패스 게이트)
 
 ## 문서
 
@@ -19,4 +19,4 @@
 
 ## 스택
 
-Three.js + Vite + TypeScript strict. 절차 생성 메시(에셋 파일 없음), localStorage 세이브(SAVE_VERSION 마이그레이션), 전작 `C:/ai-game-lab` 규약 계승.
+Three.js + Vite + TypeScript strict. 절차 생성 메시(에셋 파일 없음), 레지스트리 기반 슬롯·스테이션·발사체 확장, 세션 객체(Editor/Range), storage 주입형 localStorage 세이브(SAVE_VERSION 마이그레이션), 전작 `C:/ai-game-lab` 규약 계승.

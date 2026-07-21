@@ -9,7 +9,9 @@
     "preview": "vite preview",
     "typecheck": "tsc --noEmit",
     "test": "node --test tests/*.test.ts",
-    "verify": "npm run typecheck && npm run test"
+    "check:architecture": "node scripts/check-architecture.mjs",
+    "check:hotpaths": "node scripts/check-hotpaths.mjs",
+    "verify": "npm run typecheck && npm run test && npm run check:architecture && npm run check:hotpaths"
   },
   "dependencies": {
     "three": "^0.184.0"

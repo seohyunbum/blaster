@@ -1,16 +1,17 @@
 // src/game/range.ts — 사격장 컨트롤러: 타겟 메시 + 발사체 풀(64) + 스윕 판정 (04).
 // 핫패스(update) 할당 금지 — 모듈 스크래치 재사용, 풀 선할당.
 import * as THREE from 'three'
-import type { ShotProfile } from './types.ts'
+import type { ProjectileKind, ShotProfile } from './types.ts'
 import {
   PROJECTILE_BASE_RADIUS,
   PROJECTILE_GRAVITY,
   sweepHitSphere,
   type Vec3,
 } from './ballistics.ts'
-import { fixedMaterial, paintMaterial } from './materials.ts'
+import { fixedMaterial } from './materials.ts'
+import { PERFORMANCE_BUDGETS } from './budgets.ts'
+import { PROJECTILE_DEFS, PROJECTILE_KINDS } from './definitions.ts'
 
-const POOL_SIZE = 128 // 미니건 6연장 버스트를 하늘에 난사해도 비행 중 탄이 안 사라지게 (64→128)
 const CONFETTI_MAX = 240
 const ASSIST_RADIUS_MUL = 1.7 // 데스크톱 어시스트 — 아이 친화로 상향 (04 §8 ①)
 const GUIDE_DOTS = 18 // 탄착 궤적 가이드 점
@@ -34,6 +35,7 @@ interface Pooled {
   gravity: number
   radius: number
   ttl: number
+  kind: ProjectileKind
 }
 
 interface Balloon {
@@ -72,15 +74,31 @@ export class RangeController {
   private confActive: boolean[] = []
   private confHead = 0
   private guide: THREE.InstancedMesh
+  private projectileVisuals: Record<
+    ShotProfile['kind'],
+    { geometry: THREE.BufferGeometry; material: THREE.Material }
+  >
   onHit: ((e: HitEvent) => void) | null = null
 
   constructor() {
     this.buildScene()
     // 발사체 풀 선할당
-    const dartGeo = new THREE.SphereGeometry(1, 8, 6)
-    const dartMat = paintMaterial('blasterYellow', 'gloss')
-    for (let i = 0; i < POOL_SIZE; i++) {
-      const mesh = new THREE.Mesh(dartGeo, dartMat)
+    const projectileVisuals = {} as Record<
+      ShotProfile['kind'],
+      { geometry: THREE.BufferGeometry; material: THREE.Material }
+    >
+    for (const kind of PROJECTILE_KINDS) {
+      const def = PROJECTILE_DEFS[kind]
+      const geometry = def.shape === 'dart'
+        ? new THREE.CapsuleGeometry(0.55, 0.9, 4, 8).rotateX(Math.PI / 2)
+        : new THREE.SphereGeometry(1, 8, 6)
+      const material = new THREE.MeshStandardMaterial({ color: def.color, roughness: 0.45 })
+      projectileVisuals[kind] = { geometry, material }
+    }
+    this.projectileVisuals = projectileVisuals
+    const initial = this.projectileVisuals.dart
+    for (let i = 0; i < PERFORMANCE_BUDGETS.projectilePool; i++) {
+      const mesh = new THREE.Mesh(initial.geometry, initial.material)
       mesh.visible = false
       this.group.add(mesh)
       this.pool.push({
@@ -92,6 +110,7 @@ export class RangeController {
         gravity: 4,
         radius: 0.025,
         ttl: 0,
+        kind: 'dart',
       })
     }
     // 콘페티 InstancedMesh 1개 (draw call 1)
@@ -255,6 +274,10 @@ export class RangeController {
     return n
   }
 
+  get projectileCapacity(): number {
+    return this.pool.length
+  }
+
   reset(): void {
     for (const p of this.pool) {
       p.active = false
@@ -271,8 +294,12 @@ export class RangeController {
     const p = this.pool.find((x) => !x.active) ?? this.oldest()
     p.active = true
     p.mesh.visible = true
+    const visual = this.projectileVisuals[profile.kind]
+    p.mesh.geometry = visual.geometry
+    p.mesh.material = visual.material
     p.gravity = PROJECTILE_GRAVITY[profile.kind]
     p.radius = PROJECTILE_BASE_RADIUS[profile.kind] * profile.projectileScale
+    p.kind = profile.kind
     p.mesh.scale.setScalar(Math.max(0.04, p.radius))
     p.ttl = 3
     p.pos.copy(origin)
@@ -318,7 +345,7 @@ export class RangeController {
           b.alive = false
           b.root.visible = false
           b.respawnAt = nowMs + 3000
-          this.spawnConfetti(b.center)
+          this.spawnConfetti(b.center, p.kind)
           this.onHit?.({
             kind: 'balloon',
             points: b.basePoints,
@@ -362,9 +389,11 @@ export class RangeController {
     this.updateConfetti(dt)
   }
 
-  private spawnConfetti(at: THREE.Vector3): void {
-    const palette = [0xff8a2b, 0x2f7fe8, 0xf05454, 0x4cd964, 0xffd23f, 0xffb5c9]
-    for (let k = 0; k < 12; k++) {
+  private spawnConfetti(at: THREE.Vector3, kind: ProjectileKind): void {
+    const projectile = PROJECTILE_DEFS[kind]
+    const palette = [projectile.color, 0xff8a2b, 0x2f7fe8, 0xf05454, 0x4cd964, 0xffd23f]
+    const count = projectile.hitEffect === 'splash' ? 18 : 12
+    for (let k = 0; k < count; k++) {
       const i = this.confHead
       this.confHead = (this.confHead + 1) % CONFETTI_MAX
       this.confActive[i] = true

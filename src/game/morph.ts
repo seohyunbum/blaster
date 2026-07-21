@@ -2,31 +2,16 @@
 // 저장·UI·undo 전부 t ∈ [0,1]. 모양(shape) 파라미터는 기본 0.5(변형 없음),
 // 장식(deco) 파라미터는 기본 0(없음). 상세 정본 = docs/design/09_freeform.md
 import type { MorphKey, MorphState, StatDelta } from './types.ts'
+import { SLOT_DEFS, type MorphArchetype, type SlotType } from './definitions.ts'
+
+export type { MorphArchetype } from './definitions.ts'
 
 /** 변형 가능한 파츠 원형 = 슬롯명과 동일 (전 슬롯이 주무를 수 있다). */
-export type MorphArchetype =
-  | 'body'
-  | 'barrel'
-  | 'sight'
-  | 'grip'
-  | 'stock'
-  | 'muzzle'
-  | 'magazine'
 export type MorphGroup = 'shape' | 'deco'
 
-const ARCHETYPES: readonly string[] = [
-  'body',
-  'barrel',
-  'sight',
-  'grip',
-  'stock',
-  'muzzle',
-  'magazine',
-]
-
 /** 슬롯명 → 원형. 변형 불가 슬롯이면 null. */
-export function archetypeForSlot(slot: string): MorphArchetype | null {
-  return ARCHETYPES.includes(slot) ? (slot as MorphArchetype) : null
+export function archetypeForSlot(slot: SlotType): MorphArchetype | null {
+  return SLOT_DEFS[slot].morphArchetype
 }
 
 export interface MorphParamDef {

@@ -1,21 +1,12 @@
 // src/game/types.ts — 공용 타입 단일 소스 (leaf, main.ts import 금지).
 // 값은 담지 않는다(순수 타입) — verbatimModuleSyntax 하에서 전부 erase 된다.
 import type { PaletteKey } from './palette.ts'
+import type { ProjectileKind, SlotType } from './definitions.ts'
+
+export type { ProjectileKind, SlotType } from './definitions.ts'
 
 // ─── 슬롯·파츠 ──────────────────────────────────────────────
-export type SlotType =
-  | 'body'
-  | 'barrel'
-  | 'magazine'
-  | 'sight'
-  | 'stock'
-  | 'muzzle'
-  | 'grip'
-  | 'strap'
-  | 'special'
-
-export type SocketId = SlotType // 결정문 2 — 소켓 문자열 = 슬롯명
-export type ProjectileKind = 'dart' | 'gel' | 'paint' // 00_DECISIONS R1 (foam 폐기)
+export type SocketId = Exclude<SlotType, 'body'> // 몸통에 선언 가능한 부착 소켓
 export type PartId = string // id 규약: body_*, barrel_* … (03 정본)
 
 export interface StatDelta {
@@ -32,23 +23,41 @@ export interface CoreStats {
   weight: number
 }
 
-export interface PartDef {
+export interface PartCapabilities {
+  mount?: 'gripTop'
+  viewmodelFit?: 'oversize' | 'compact'
+  hidesBodyCarryHandle?: boolean
+}
+
+export interface PartBase<S extends SlotType> {
   id: PartId
-  slot: SlotType
+  slot: S
   nameKo: string
   desc: string
   delta: StatDelta
-  kind?: ProjectileKind // barrel 이 지정하면 최우선
-  capacity?: number // magazine 전용 — M2
-  reloadSec?: number // magazine 전용 — M2
+  capabilities?: PartCapabilities
 }
 
-export interface BodyDef extends PartDef {
-  slot: 'body'
+export interface BodyDef extends PartBase<'body'> {
   base: CoreStats
   sockets: readonly SocketId[]
   weightLimit: number
 }
+
+export interface BarrelDef extends PartBase<'barrel'> {
+  kind?: ProjectileKind
+}
+
+export interface MagazineDef extends PartBase<'magazine'> {
+  capacity: number
+  reloadSec: number
+}
+
+export type AccessorySlot = Exclude<SlotType, 'body' | 'barrel' | 'magazine'>
+export interface AccessoryDef extends PartBase<AccessorySlot> {}
+
+export type PartDef = BarrelDef | MagazineDef | AccessoryDef
+export type CatalogPartDef = BodyDef | PartDef
 
 // ─── 색칠 ──────────────────────────────────────────────────
 export type ZoneId = 'primary' | 'secondary' | 'accent'

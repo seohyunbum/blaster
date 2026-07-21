@@ -1,10 +1,11 @@
 // src/game/assembly.ts — 조립 합성: Blaster 데이터 → THREE.Group (leaf).
 // buildPart 하나를 공유하므로 공방·사격장 뷰모델·썸네일이 같은 형태를 본다 (03 §7).
 import * as THREE from 'three'
-import type { Blaster, PartInstance, PartPaint, SlotType, ZoneId } from './types.ts'
+import type { Blaster, PartPaint, SlotType, ZoneId } from './types.ts'
 import { buildPart, type BuiltPart } from './partVisuals.ts'
 import { paintMaterial } from './materials.ts'
-import { bodyOf } from './parts.ts'
+import { bodyOf, CATALOG } from './parts.ts'
+import { DIRECT_ATTACH_SLOTS } from './definitions.ts'
 
 const ZONE_DEFAULT: Record<ZoneId, { color: string; finish: 'matte' | 'gloss' | 'metal' }> = {
   primary: { color: 'blasterBlue', finish: 'gloss' },
@@ -29,8 +30,6 @@ export interface BuiltBlaster {
 }
 
 // 몸통 소켓에 직접 부착하는 슬롯 (머즐은 배럴 끝 승계라 별도 처리)
-const ATTACH_SLOTS: SlotType[] = ['barrel', 'sight', 'grip', 'stock', 'magazine', 'strap']
-
 function attachTo(
   anchor: THREE.Object3D,
   inst: { partId: string; morph: import('./types.ts').MorphState; paint: PartPaint },
@@ -59,18 +58,19 @@ export function buildBlaster(
     return { group, parts, dispose: () => {} }
   }
   // 미니건 손잡이는 몸통 위에 얹히므로 몸통 캐리핸들과 자리가 겹친다 → 캐리핸들 생략(관통 방지)
-  const hideCarryHandle = blaster.parts.grip?.partId === 'grip_minigun'
+  const gripDef = blaster.parts.grip ? CATALOG.get(blaster.parts.grip.partId) : undefined
+  const hideCarryHandle = gripDef?.capabilities?.hidesBodyCarryHandle === true
   const bodyBuilt = buildPart(bodyInst.partId, { morph: bodyInst.morph, lod, hideCarryHandle })
   applyPaint(bodyBuilt, bodyInst.paint)
   parts.body = bodyBuilt
   group.add(bodyBuilt.group)
 
-  for (const slot of ATTACH_SLOTS) {
+  for (const slot of DIRECT_ATTACH_SLOTS) {
     const inst = blaster.parts[slot]
     if (!inst) continue
     // 미니건 손잡이는 몸통 위(gripTop) 마운트로, 그 외 그립·파츠는 기본 소켓으로
     const anchor =
-      slot === 'grip' && inst.partId === 'grip_minigun'
+      slot === 'grip' && CATALOG.get(inst.partId)?.capabilities?.mount === 'gripTop'
         ? (bodyBuilt.anchors.gripTop ?? bodyBuilt.anchors.grip)
         : bodyBuilt.anchors[slot]
     if (!anchor) continue
@@ -97,15 +97,12 @@ export function buildBlaster(
 export function availableSlots(blaster: Blaster): SlotType[] {
   const body = bodyOf(blaster)
   if (!body) return []
-  return ATTACH_SLOTS.filter((s) => body.sockets.includes(s))
+  return DIRECT_ATTACH_SLOTS.filter((s) => body.sockets.includes(s))
 }
 
 /** 파츠 인스턴스의 색칠 존 목록 (paint 패널 버튼 활성화용). */
-export function paintableZones(inst: PartInstance): ZoneId[] {
-  const built = buildPart(inst.partId, { morph: inst.morph, lod: 'drag' })
-  const zones = (['primary', 'secondary', 'accent'] as ZoneId[]).filter(
+export function paintableZones(built: BuiltPart): ZoneId[] {
+  return (['primary', 'secondary', 'accent'] as ZoneId[]).filter(
     (z) => (built.zones[z]?.length ?? 0) > 0,
   )
-  built.dispose()
-  return zones
 }

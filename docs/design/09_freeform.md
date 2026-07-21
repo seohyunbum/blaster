@@ -99,7 +99,7 @@ export function buildPart(partId: PartId, opts: BuildOpts): BuiltPart;
 | pointerup | 즉시 1회 | `full` | 풀 세그먼트 재빌드 + 줄무늬 재도색 + undo push + 자동저장 flush |
 | 프리셋 시드 버튼 (M1.5) | 즉시 1회 | `full` | 동일 (드래그 국면 없음) |
 
-- 비용 상한: 파츠당 메시 ≤6(결정문 23), full LOD ≤2,500 vert·drag LOD ≤1,200 vert → 재빌드 1회 <1ms 급. 30Hz 스로틀은 안전 여유다.
+- 비용 상한: 파츠당 메시 ≤14(결정문 23), full LOD ≤2,500 vert·drag LOD ≤1,200 vert → 재빌드 1회 <1ms 급. 30Hz 스로틀은 안전 여유다.
 - 재빌드는 **pointer 이벤트 경로에서만** 발생 — `update*/animate*/tick*` 밖이므로 07 핫패스 할당 게이트와 충돌 없음(빌더 이름도 `rebuild*` 로, `update*` 금지).
 
 ### 3.3 소켓 앵커 재계산 — "형태가 늘면 소켓이 따라간다"
@@ -115,7 +115,7 @@ export function buildPart(partId: PartId, opts: BuildOpts): BuiltPart;
 
 ### 3.5 성능 예산 준수 (07 단일표 참조)
 
-morph 는 **메시 수·머티리얼 수·draw call 을 바꾸지 않는다** (지오메트리 attribute 만 교체). 블래스터 draw call ≤12·파츠당 메시 ≤6 은 morph 극단값에서도 불변 — verify 테스트가 극단 morph 로 `countMeshes` 를 재검사한다(§7).
+morph 는 **메시 수·머티리얼 수·draw call 을 바꾸지 않는다** (지오메트리 attribute 만 교체). 블래스터 draw call ≤56·파츠당 메시 ≤14 은 morph 극단값에서도 불변 — verify 테스트가 극단 morph 로 `countMeshes` 를 재검사한다(§7).
 
 ---
 
@@ -219,7 +219,7 @@ export interface Blaster {
 ### 7.2 08 체크리스트 추가 항목 (결정문 25 연장)
 
 - [ ] 봉투 상수(세장비 4.2 · L/r 15 · 최소 단면 0.028 · 라운드 25% · 전장 1.10)가 `morph.ts` 코드 상수로 존재하고 매직넘버가 빌더에 흩어져 있지 않다
-- [ ] **교차표 테스트**: 전 partId × 범위 꼭짓점 전수 검산 + **속성 테스트** 랜덤 morph **50 콤보**(M1, M1.5 에서 200 확장) × 전 파츠에서 봉투 assertion + `countMeshes ≤ 6` 불변 (verify 편입)
+- [ ] **교차표 테스트**: 전 partId × 범위 꼭짓점 전수 검산 + **속성 테스트** 랜덤 morph **50 콤보**(M1, M1.5 에서 200 확장) × 전 파츠에서 봉투 assertion + `countMeshes ≤ 14` 불변 (verify 편입)
 - [ ] boundingBox 스모크(03 §8-4)는 기본형(t=0.5)에서 ±10%, 극단(t=0/1)에서 봉투 안
 - [ ] 극단 조합 스크린샷 시트(playwright, 최소·최대·랜덤 6컷)를 마일스톤마다 아빠가 육안 검수 — **M1.5**
 - [ ] 금칙어 스캔(08 §3.1)에 morph 라벨 문자열 포함

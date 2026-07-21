@@ -9,6 +9,7 @@ import {
 } from '../game/morph.ts'
 import { makeStarBar } from './stars.ts'
 import { icoShoot, icoDice } from './icons.ts'
+import { SLOT_DEFS, WORKSHOP_SLOTS } from '../game/definitions.ts'
 
 export interface WorkshopCallbacks {
   onSelectPart: (slot: SlotType, partId: string | null) => void
@@ -19,17 +20,6 @@ export interface WorkshopCallbacks {
   onRandomizeAll: () => void
   onGoRange: () => void
 }
-
-const SLOT_TABS: { slot: SlotType; label: string }[] = [
-  { slot: 'body', label: '몸통' },
-  { slot: 'barrel', label: '배럴' },
-  { slot: 'magazine', label: '다트 팩' },
-  { slot: 'sight', label: '조준기' },
-  { slot: 'grip', label: '그립' },
-  { slot: 'stock', label: '스톡' },
-  { slot: 'strap', label: '어깨끈' },
-  { slot: 'muzzle', label: '총구' },
-]
 
 const STAT_ROWS: { key: keyof BlasterStats; label: string }[] = [
   { key: 'power', label: '파워' },
@@ -91,12 +81,12 @@ export function createWorkshopPanel(root: HTMLElement, cb: WorkshopCallbacks) {
 
   function renderTabs(): void {
     tabs.innerHTML = ''
-    for (const t of SLOT_TABS) {
+    for (const slot of WORKSHOP_SLOTS) {
       const b = document.createElement('button')
-      b.className = 'slot-tab' + (t.slot === activeSlot ? ' active' : '')
-      b.textContent = t.label
+      b.className = 'slot-tab' + (slot === activeSlot ? ' active' : '')
+      b.textContent = SLOT_DEFS[slot].labelKo
       b.addEventListener('click', () => {
-        activeSlot = t.slot
+        activeSlot = slot
         renderAll()
       })
       tabs.appendChild(b)
@@ -115,7 +105,7 @@ export function createWorkshopPanel(root: HTMLElement, cb: WorkshopCallbacks) {
     for (const def of options) {
       // 탄창 카드엔 용량을 함께 보여 골라 담기 쉽게
       const label =
-        activeSlot === 'magazine' && def.capacity ? `${def.nameKo} · ${def.capacity}발` : def.nameKo
+        def.slot === 'magazine' ? `${def.nameKo} · ${def.capacity}발` : def.nameKo
       parts.appendChild(
         partCard(label, current === def.id, () => cb.onSelectPart(activeSlot, def.id)),
       )
