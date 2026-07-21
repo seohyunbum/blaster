@@ -4,7 +4,7 @@
 export const FORBIDDEN_KO: readonly string[] = [
   '총알', '탄환', '탄약', '사살', '헤드샷', '데미지', '대미지', '무기', '화기',
   '처치', '적군', '탄창', '발포', '폭파', '저격', '스나이퍼', '게임오버', '패배',
-  '사망', '글록',
+  '사망', '글록', '링스', '스콜피온', '베레타', '배레타',
 ]
 
 /** 금지어를 부분 포함하지만 허용하는 복합어 (선허용 후매칭). 현재 없음. */
@@ -13,7 +13,7 @@ export const ALLOWED_KO_COMPOUNDS: readonly string[] = []
 /** 식별자를 camelCase/snake_case/숫자 경계로 분해한 토큰과 "완전 일치". */
 export const FORBIDDEN_EN_TOKENS: readonly string[] = [
   'kill', 'damage', 'weapon', 'ammo', 'sniper', 'gun', 'bullet',
-  'ak', 'm16', 'm4', 'mp5', 'glock',
+  'ak', 'm16', 'm4', 'mp5', 'glock', 'awm', 'mg3', 'aug', 'beretta', 'skorpion', 'scorpion',
 ]
 
 export interface VocabHit {

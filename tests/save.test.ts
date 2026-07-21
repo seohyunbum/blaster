@@ -25,9 +25,13 @@ test('roundtrip: morph 포함 저장→로드 deepEqual (핵심 필드)', () => 
     name: '번개팝콘',
     createdAt: 1789000000000,
     parts: {
-      body: makeInstance('body_popcorn', { bodyLength: 0.8, bodyChub: 0.3 }),
-      barrel: makeInstance('barrel_rail', { barrelLength: 1 }),
-      sight: makeInstance('sight_dot'),
+      body: makeInstance('body_comet', { bodyLength: 0.8, bodyChub: 0.3 }),
+      barrel: makeInstance('barrel_turbine', { barrelLength: 1 }),
+      magazine: makeInstance('mag_powerbox', { magSize: 0.7 }),
+      sight: makeInstance('sight_bridge'),
+      grip: makeInstance('grip_hook'),
+      stock: makeInstance('stock_wire'),
+      muzzle: makeInstance('muzzle_duo'),
       strap: makeInstance('strap_comfy'),
     },
   }
@@ -41,9 +45,15 @@ test('roundtrip: morph 포함 저장→로드 deepEqual (핵심 필드)', () => 
   const lb = loaded.blasters[0]!
   assert.equal(lb.id, 'b1')
   assert.equal(lb.name, '번개팝콘')
+  assert.equal(lb.parts.body!.partId, 'body_comet')
   assert.deepEqual(lb.parts.body!.morph, { bodyLength: 0.8, bodyChub: 0.3 })
   assert.deepEqual(lb.parts.barrel!.morph, { barrelLength: 1 })
+  assert.equal(lb.parts.magazine!.partId, 'mag_powerbox')
+  assert.deepEqual(lb.parts.magazine!.morph, { magSize: 0.7 })
   assert.deepEqual(lb.parts.sight!.morph, {})
+  assert.equal(lb.parts.grip!.partId, 'grip_hook')
+  assert.equal(lb.parts.stock!.partId, 'stock_wire')
+  assert.equal(lb.parts.muzzle!.partId, 'muzzle_duo')
   assert.equal(lb.parts.strap!.partId, 'strap_comfy')
 })
 

@@ -16,6 +16,9 @@ test('금칙어 한글 탐지', () => {
 test('금칙어 영문 토큰 완전일치', () => {
   assert.ok(scanIdentifier('killCount').length > 0)
   assert.ok(scanIdentifier('dealDamage').length > 0)
+  assert.ok(scanIdentifier('awm').length > 0)
+  assert.ok(scanIdentifier('mg3_variant').length > 0)
+  assert.ok(scanIdentifier('beretta').length > 0)
   assert.equal(scanIdentifier('skillTree').length, 0) // "skill" 은 통과
   assert.equal(scanIdentifier('speakLoud').length, 0) // "ak" 부분매칭 안 됨
 })

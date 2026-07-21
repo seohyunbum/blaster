@@ -60,8 +60,8 @@ export interface BlasterLabDebugHandle {
 
 | 항목 | 예산 | 비고 |
 | --- | --- | --- |
-| 블래스터 draw call | ≤ 12 | morph 극단값에서도 불변 — morph 는 지오메트리 attribute 만 교체(09 §3.5) |
-| 파츠당 메시 | ≤ 6 | 09 교차표 테스트가 극단 morph 로 `countMeshes` 재검사 |
+| 블래스터 draw call | ≤ 56 | 8슬롯 완전 장착 + 슬롯별 자유 장식 극단의 보수적 합산 상한. 자동 테스트로 재계산하며 후속 병합 최적화 시 하향 ratchet |
+| 파츠당 메시 | ≤ 14 | 전 카탈로그×기본/극단 morph로 `countMeshes` 자동 재검사. 몸통 최악 = 기본5+고유2+자유장식7 |
 | 투사체 풀 | 64 | 전작 §10-5 "spawn = 제거 경로 + 상한" 그대로 |
 | 씬 총 예산 (draw call) | ≤ 300 | perf-smoke 실측 대조 |
 | 가시 메시 (perf-smoke 실측) | ≤ 800 | 정적 공방·사격장 씬 — 전작(~6,160) 대비 낮게 시작해 ratchet |

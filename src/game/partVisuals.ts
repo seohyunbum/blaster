@@ -31,6 +31,8 @@ interface BodyDims {
   d: number
   /** 셸 실루엣 — 몸통마다 형태 자체가 다르다 */
   shell: 'box' | 'capsule' | 'sphere'
+  /** 카탈로그 고유 장식 — 최대 2메시로 몸통 계열을 한눈에 구분한다. */
+  detail?: 'pods' | 'wheels' | 'bumpers' | 'rearBubble' | 'twinCheeks' | 'hook' | 'wings'
 }
 const BODY_DIMS: Record<string, BodyDims> = {
   body_popcorn: { w: 0.14, h: 0.16, d: 0.44, shell: 'box' },
@@ -43,6 +45,13 @@ const BODY_DIMS: Record<string, BodyDims> = {
   body_chunk: { w: 0.22, h: 0.17, d: 0.42, shell: 'box' },
   // 미니건 코어 — 동그랗고 압도적으로 큰 왕구슬(전 몸통 중 최대 실루엣)
   body_minigun: { w: 0.36, h: 0.36, d: 0.52, shell: 'sphere' },
+  body_comet: { w: 0.2, h: 0.24, d: 0.58, shell: 'capsule', detail: 'pods' },
+  body_turbine: { w: 0.29, h: 0.27, d: 0.54, shell: 'box', detail: 'wheels' },
+  body_buzz: { w: 0.15, h: 0.17, d: 0.3, shell: 'sphere', detail: 'bumpers' },
+  body_reverse: { w: 0.23, h: 0.24, d: 0.46, shell: 'capsule', detail: 'rearBubble' },
+  body_duo: { w: 0.23, h: 0.19, d: 0.43, shell: 'box', detail: 'twinCheeks' },
+  body_hook: { w: 0.17, h: 0.19, d: 0.34, shell: 'capsule', detail: 'hook' },
+  body_racer: { w: 0.18, h: 0.17, d: 0.43, shell: 'box', detail: 'wings' },
 }
 
 /** 몸통 셸 지오메트리 — 실루엣 자체를 바꾼다(박스/캡슐/구). */
@@ -71,6 +80,8 @@ function makeShell(
 interface BarrelDims {
   r: number
   l: number
+  style?: 'beads' | 'wheel' | 'bubble' | 'balance' | 'bell' | 'fins'
+  baseCount?: number
 }
 const BARREL_DIMS: Record<string, BarrelDims> = {
   barrel_snap: { r: 0.035, l: 0.18 },
@@ -78,8 +89,14 @@ const BARREL_DIMS: Record<string, BarrelDims> = {
   barrel_stub: { r: 0.05, l: 0.16 },
   barrel_spiral: { r: 0.04, l: 0.32 },
   barrel_wide: { r: 0.058, l: 0.22 },
-  barrel_twin: { r: 0.03, l: 0.3 },
+  barrel_twin: { r: 0.03, l: 0.3, baseCount: 2 },
   barrel_needle: { r: 0.022, l: 0.44 },
+  barrel_comet: { r: 0.032, l: 0.38, style: 'beads' },
+  barrel_turbine: { r: 0.052, l: 0.3, style: 'wheel' },
+  barrel_buzz: { r: 0.045, l: 0.14, style: 'bubble' },
+  barrel_reverse: { r: 0.04, l: 0.23, style: 'balance' },
+  barrel_hook: { r: 0.055, l: 0.13, style: 'bell' },
+  barrel_racer: { r: 0.03, l: 0.34, style: 'fins' },
 }
 
 function segFor(lod: 'drag' | 'full' | undefined, full: number, drag: number): number {
@@ -161,6 +178,81 @@ function buildBody(partId: PartId, opts: BuildOpts): BuiltPart {
   cap.position.set(0, 0, noseBaseZ - noseLen)
   primary.push(cap)
   group.add(cap)
+
+  // 카탈로그 고유 시그니처. 모두 둥근 장난감 형태이며, 극단 morph에서도
+  // 몸통 메시 예산(기본 5 + 고유 2 + 자유 장식 7 = 14)을 넘지 않는다.
+  if (dims.detail === 'pods' || dims.detail === 'bumpers') {
+    const podR = Math.min(w, h) * (dims.detail === 'pods' ? 0.25 : 0.31)
+    const podGeo = new THREE.SphereGeometry(podR, coneSeg, Math.max(6, coneSeg / 2))
+    geos.push(podGeo)
+    for (const sx of [-1, 1]) {
+      const pod = new THREE.Mesh(podGeo, fixedMaterial(PLACEHOLDER))
+      pod.position.set(sx * (w * 0.5 + podR * 0.35), -h * 0.02, -d * 0.05)
+      secondary.push(pod)
+      group.add(pod)
+    }
+  } else if (dims.detail === 'wheels') {
+    const wheelGeo = new THREE.TorusGeometry(h * 0.31, h * 0.1, 7, coneSeg)
+    wheelGeo.rotateY(Math.PI / 2)
+    geos.push(wheelGeo)
+    for (const sx of [-1, 1]) {
+      const wheel = new THREE.Mesh(wheelGeo, fixedMaterial(PLACEHOLDER))
+      wheel.position.set(sx * (w * 0.5 + 0.004), 0, d * 0.08)
+      accent.push(wheel)
+      group.add(wheel)
+    }
+  } else if (dims.detail === 'rearBubble') {
+    const bubbleR = h * 0.3
+    const bubbleGeo = new THREE.SphereGeometry(bubbleR, coneSeg, Math.max(6, coneSeg / 2))
+    geos.push(bubbleGeo)
+    const bubble = new THREE.Mesh(bubbleGeo, fixedMaterial(PLACEHOLDER))
+    bubble.position.set(0, h * 0.18, halfZ * 0.68)
+    secondary.push(bubble)
+    group.add(bubble)
+    const haloGeo = new THREE.TorusGeometry(bubbleR * 0.72, bubbleR * 0.15, 6, coneSeg)
+    geos.push(haloGeo)
+    const halo = new THREE.Mesh(haloGeo, fixedMaterial(PLACEHOLDER))
+    halo.position.copy(bubble.position)
+    accent.push(halo)
+    group.add(halo)
+  } else if (dims.detail === 'twinCheeks') {
+    const cheekR = h * 0.2
+    const cheekGeo = new THREE.CapsuleGeometry(cheekR, d * 0.4, 3, coneSeg)
+    cheekGeo.rotateX(Math.PI / 2)
+    geos.push(cheekGeo)
+    for (const sx of [-1, 1]) {
+      const cheek = new THREE.Mesh(cheekGeo, fixedMaterial(PLACEHOLDER))
+      cheek.position.set(sx * (w * 0.5 + cheekR * 0.25), -h * 0.08, 0)
+      secondary.push(cheek)
+      group.add(cheek)
+    }
+  } else if (dims.detail === 'hook') {
+    const hookR = h * 0.32
+    const hookGeo = new THREE.TorusGeometry(hookR, h * 0.07, 6, coneSeg, Math.PI * 1.45)
+    hookGeo.rotateY(Math.PI / 2)
+    geos.push(hookGeo)
+    const hook = new THREE.Mesh(hookGeo, fixedMaterial(PLACEHOLDER))
+    hook.position.set(w * 0.5 + 0.008, -h * 0.05, d * 0.08)
+    hook.rotation.x = -0.4
+    accent.push(hook)
+    group.add(hook)
+    const beadGeo = new THREE.SphereGeometry(h * 0.075, 8, 6)
+    geos.push(beadGeo)
+    const bead = new THREE.Mesh(beadGeo, fixedMaterial(PLACEHOLDER))
+    bead.position.set(w * 0.5 + 0.008, -h * 0.32, d * 0.17)
+    accent.push(bead)
+    group.add(bead)
+  } else if (dims.detail === 'wings') {
+    const wingGeo = new RoundedBoxGeometry(w * 0.18, h * 0.3, d * 0.48, 2, 0.012)
+    geos.push(wingGeo)
+    for (const sx of [-1, 1]) {
+      const wing = new THREE.Mesh(wingGeo, fixedMaterial(PLACEHOLDER))
+      wing.position.set(sx * (w * 0.56), -h * 0.05, d * 0.05)
+      wing.rotation.z = sx * -0.28
+      accent.push(wing)
+      group.add(wing)
+    }
+  }
 
   // ── 장식 (켰을 때만 생성) ──
   const finT = morphLerp('bodyFin', resolveMorph(opts.morph, 'bodyFin'))
@@ -247,7 +339,20 @@ function buildBody(partId: PartId, opts: BuildOpts): BuiltPart {
   // 현재 몸통 morph 치수에 맞게 비례시켜 작은 코어부터 왕구슬 코어까지 밀착시킨다.
   const strapAnchor = new THREE.Object3D()
   const strapScale = d / 0.44
-  strapAnchor.position.set(w * 0.5 - 0.004, h * 0.2, 0)
+  let strapOuterX = w * 0.5
+  if (dims.detail === 'pods' || dims.detail === 'bumpers') {
+    const podR = Math.min(w, h) * (dims.detail === 'pods' ? 0.25 : 0.31)
+    strapOuterX += podR * 1.35
+  } else if (dims.detail === 'wheels') {
+    strapOuterX += 0.004 + h * 0.41
+  } else if (dims.detail === 'twinCheeks') {
+    strapOuterX += h * 0.25
+  } else if (dims.detail === 'hook') {
+    strapOuterX += 0.008 + h * 0.07
+  } else if (dims.detail === 'wings') {
+    strapOuterX += w * 0.16
+  }
+  strapAnchor.position.set(strapOuterX - 0.004, h * 0.2, 0)
   strapAnchor.scale.set(1, Math.max(0.85, strapScale), strapScale)
   group.add(strapAnchor)
 
@@ -285,7 +390,7 @@ function buildBarrel(partId: PartId, opts: BuildOpts): BuiltPart {
   const accent: THREE.Mesh[] = []
 
   const radial = segFor(opts.lod, 14, 8)
-  const count = barrelCountFromMorph(opts.morph)
+  const count = Math.max(dims.baseCount ?? 1, barrelCountFromMorph(opts.morph))
   // 앞끝이 넓은 뿔 배럴에서도 총열이 안 겹치도록 앞끝 반경 기준으로 간격 산정
   const offsets = barrelLayout(count, Math.max(r, rFront))
 
@@ -319,6 +424,66 @@ function buildBarrel(partId: PartId, opts: BuildOpts): BuiltPart {
     hub.position.set(0, 0, -l * 0.16)
     secondary.push(hub)
     group.add(hub)
+  }
+
+  // 파츠별 고유 장식. 자유 장식과 함께 켜져도 14메시 예산 안에서 유지한다.
+  const styleR = Math.max(r, rFront)
+  if (dims.style === 'beads') {
+    const beadGeo = new THREE.TorusGeometry(styleR * 1.35, styleR * 0.22, 6, radial)
+    geos.push(beadGeo)
+    for (const z of [-l * 0.36, -l * 0.72]) {
+      const bead = new THREE.Mesh(beadGeo, fixedMaterial(PLACEHOLDER))
+      bead.position.z = z
+      accent.push(bead)
+      group.add(bead)
+    }
+  } else if (dims.style === 'wheel') {
+    const wheelGeo = new THREE.TorusGeometry(styleR * 1.5, styleR * 0.3, 7, radial)
+    geos.push(wheelGeo)
+    const wheel = new THREE.Mesh(wheelGeo, fixedMaterial(PLACEHOLDER))
+    wheel.position.z = -l * 0.5
+    accent.push(wheel)
+    group.add(wheel)
+    const hubGeo = new THREE.SphereGeometry(styleR * 0.42, radial, Math.max(6, radial - 2))
+    geos.push(hubGeo)
+    const hub = new THREE.Mesh(hubGeo, fixedMaterial(PLACEHOLDER))
+    hub.position.z = -l * 0.5
+    secondary.push(hub)
+    group.add(hub)
+  } else if (dims.style === 'bubble') {
+    const bubbleGeo = new THREE.SphereGeometry(styleR * 1.25, radial, Math.max(6, radial - 2))
+    bubbleGeo.scale(1, 1, 1.15)
+    geos.push(bubbleGeo)
+    const bubble = new THREE.Mesh(bubbleGeo, fixedMaterial(PLACEHOLDER))
+    bubble.position.z = -l * 0.34
+    secondary.push(bubble)
+    group.add(bubble)
+  } else if (dims.style === 'balance') {
+    const orbGeo = new THREE.SphereGeometry(styleR * 0.58, radial, Math.max(6, radial - 2))
+    geos.push(orbGeo)
+    for (const sx of [-1, 1]) {
+      const orb = new THREE.Mesh(orbGeo, fixedMaterial(PLACEHOLDER))
+      orb.position.set(sx * styleR * 1.55, 0, -l * 0.48)
+      accent.push(orb)
+      group.add(orb)
+    }
+  } else if (dims.style === 'bell') {
+    const bellGeo = new THREE.TorusGeometry(styleR * 1.32, styleR * 0.28, 7, radial)
+    geos.push(bellGeo)
+    const bell = new THREE.Mesh(bellGeo, fixedMaterial(PLACEHOLDER))
+    bell.position.z = -l * 0.76
+    accent.push(bell)
+    group.add(bell)
+  } else if (dims.style === 'fins') {
+    const finGeo = new RoundedBoxGeometry(styleR * 0.42, styleR * 1.6, l * 0.38, 2, styleR * 0.12)
+    geos.push(finGeo)
+    for (const sx of [-1, 1]) {
+      const fin = new THREE.Mesh(finGeo, fixedMaterial(PLACEHOLDER))
+      fin.position.set(sx * styleR * 1.15, 0, -l * 0.5)
+      fin.rotation.z = sx * -0.25
+      accent.push(fin)
+      group.add(fin)
+    }
   }
 
   // 장식 — 나팔 끝 (단일 총열일 때만)
@@ -383,7 +548,70 @@ function buildSight(partId: PartId, opts: BuildOpts): BuiltPart {
   secondary.push(mount)
   group.add(mount)
 
-  if (partId === 'sight_pin') {
+  if (partId === 'sight_comet') {
+    // 코멧 뷰어 — 둥근 긴 관측관 + 앞뒤 빛구슬
+    const tubeGeo = new THREE.CapsuleGeometry(0.017 * sz, 0.12 * sz, 3, seg)
+    tubeGeo.rotateX(Math.PI / 2)
+    geos.push(tubeGeo)
+    const tubeY = yTop + 0.018 * sz
+    const tube = new THREE.Mesh(tubeGeo, fixedMaterial(PLACEHOLDER))
+    tube.position.set(0, tubeY, -0.012)
+    primary.push(tube)
+    group.add(tube)
+    const orbGeo = new THREE.SphereGeometry(0.011 * sz, seg, Math.max(6, seg - 2))
+    geos.push(orbGeo)
+    for (const z of [-0.082 * sz, 0.058 * sz]) {
+      const orb = new THREE.Mesh(orbGeo, glowMaterial(0x7fd4ff))
+      orb.position.set(0, tubeY, z - 0.012)
+      group.add(orb)
+    }
+  } else if (partId === 'sight_bridge') {
+    // 브리지 뷰어 — 두 둥근 기둥과 가로 다리
+    const postGeo = new THREE.CapsuleGeometry(0.006 * sz, 0.045 * hi, 3, seg)
+    geos.push(postGeo)
+    for (const sx of [-1, 1]) {
+      const post = new THREE.Mesh(postGeo, fixedMaterial(PLACEHOLDER))
+      post.position.set(sx * 0.028 * sz, yTop + 0.025 * hi, 0)
+      primary.push(post)
+      group.add(post)
+    }
+    const bridgeGeo = new THREE.CapsuleGeometry(0.007 * sz, 0.056 * sz, 3, seg)
+    bridgeGeo.rotateZ(Math.PI / 2)
+    geos.push(bridgeGeo)
+    const bridge = new THREE.Mesh(bridgeGeo, fixedMaterial(PLACEHOLDER))
+    bridge.position.set(0, yTop + 0.052 * hi, 0)
+    primary.push(bridge)
+    group.add(bridge)
+    const beadGeo = new THREE.SphereGeometry(0.007 * sz, seg, Math.max(6, seg - 2))
+    geos.push(beadGeo)
+    const bead = new THREE.Mesh(beadGeo, glowMaterial(0xffd15c))
+    bead.position.set(0, yTop + 0.052 * hi, -0.008)
+    group.add(bead)
+  } else if (partId === 'sight_bubble') {
+    // 버블 뷰어 — 짧은 목 위에 발광 방울
+    const bubbleGeo = new THREE.SphereGeometry(0.025 * sz, seg, Math.max(6, seg - 2))
+    geos.push(bubbleGeo)
+    const bubble = new THREE.Mesh(bubbleGeo, fixedMaterial(PLACEHOLDER))
+    bubble.scale.y = 1.2 * hi
+    bubble.position.set(0, yTop + 0.025 * sz, 0)
+    primary.push(bubble)
+    group.add(bubble)
+    const dotGeo = new THREE.SphereGeometry(0.008 * sz, seg, Math.max(6, seg - 2))
+    geos.push(dotGeo)
+    const dot = new THREE.Mesh(dotGeo, glowMaterial(0x74f0c5))
+    dot.position.set(0, yTop + 0.027 * sz, -0.022 * sz)
+    group.add(dot)
+  } else if (partId === 'sight_fin') {
+    // 핀 뷰어 — 낮고 넓은 삼각 지느러미
+    const finGeo = new THREE.ConeGeometry(0.035 * sz, 0.055 * hi, 3)
+    geos.push(finGeo)
+    const fin = new THREE.Mesh(finGeo, fixedMaterial(PLACEHOLDER))
+    fin.scale.z = 1.6
+    fin.position.set(0, yTop + 0.027 * hi, 0)
+    fin.rotation.y = Math.PI / 2
+    primary.push(fin)
+    group.add(fin)
+  } else if (partId === 'sight_pin') {
     // 가늠 핀 — 얇은 기둥
     const postGeo = new THREE.CylinderGeometry(0.005 * sz, 0.007 * sz, 0.05 * hi, seg)
     geos.push(postGeo)
@@ -448,6 +676,7 @@ function buildGrip(partId: PartId, opts: BuildOpts): BuiltPart {
   const accent: THREE.Mesh[] = []
   const seg = segFor(opts.lod, 10, 6)
   const banana = partId === 'grip_banana'
+  const chunky = partId === 'grip_chunky'
   const gLen = morphLerp('gripLength', resolveMorph(opts.morph, 'gripLength'))
   const gThick = morphLerp('gripThick', resolveMorph(opts.morph, 'gripThick'))
   const gAng = morphLerp('gripAngle', resolveMorph(opts.morph, 'gripAngle'))
@@ -495,6 +724,115 @@ function buildGrip(partId: PartId, opts: BuildOpts): BuiltPart {
     }
   }
 
+  if (partId === 'grip_turbine') {
+    // 넓은 U자 받침 — 둥근 기둥 둘과 가로 바 하나
+    const postR = 0.011 * gThick
+    const postGeo = new THREE.CapsuleGeometry(postR, 0.055 * gLen, 3, seg)
+    geos.push(postGeo)
+    for (const sx of [-1, 1]) {
+      const post = new THREE.Mesh(postGeo, fixedMaterial(PLACEHOLDER))
+      post.position.set(sx * 0.026 * gThick, -0.04 * gLen, 0.01)
+      primary.push(post)
+      group.add(post)
+    }
+    const barGeo = new THREE.CapsuleGeometry(0.013 * gThick, 0.052 * gThick, 3, seg)
+    barGeo.rotateZ(Math.PI / 2)
+    geos.push(barGeo)
+    const bar = new THREE.Mesh(barGeo, fixedMaterial(PLACEHOLDER))
+    bar.position.set(0, -0.085 * gLen, 0.01)
+    primary.push(bar)
+    group.add(bar)
+    const ringGeo = new THREE.TorusGeometry(0.016 * gThick, 0.004, 6, seg)
+    ringGeo.rotateY(Math.PI / 2)
+    geos.push(ringGeo)
+    const ring = new THREE.Mesh(ringGeo, fixedMaterial(PLACEHOLDER))
+    ring.position.set(0, -0.085 * gLen, 0.01)
+    accent.push(ring)
+    group.add(ring)
+    return { group, zones: { primary, accent }, anchors: {}, dispose: () => geos.forEach((geo) => geo.dispose()) }
+  }
+
+  if (partId === 'grip_buzz') {
+    // 짧은 목 + 손바닥 방울
+    const stemGeo = new RoundedBoxGeometry(0.025 * gThick, 0.04 * gLen, 0.03 * gThick, 2, 0.009)
+    geos.push(stemGeo)
+    const stem = new THREE.Mesh(stemGeo, fixedMaterial(PLACEHOLDER))
+    stem.position.y = -0.018 * gLen
+    primary.push(stem)
+    group.add(stem)
+    const orbGeo = new THREE.SphereGeometry(0.032 * gThick, seg, seg)
+    geos.push(orbGeo)
+    const orb = new THREE.Mesh(orbGeo, fixedMaterial(PLACEHOLDER))
+    orb.scale.y = 1.15 * gLen
+    orb.position.set(0, -0.056 * gLen, 0.006)
+    primary.push(orb)
+    group.add(orb)
+    return { group, zones: { primary, accent }, anchors: {}, dispose: () => geos.forEach((geo) => geo.dispose()) }
+  }
+
+  if (partId === 'grip_reverse') {
+    // 뒤로 기운 캡슐 + 균형 방울
+    const rr = 0.025 * gThick
+    const ang = 0.38 + gAng * 0.2
+    const bodyGeo = new THREE.CapsuleGeometry(rr, 0.082 * gLen, 3, seg)
+    geos.push(bodyGeo)
+    const body = new THREE.Mesh(bodyGeo, fixedMaterial(PLACEHOLDER))
+    body.rotation.x = ang
+    body.position.set(0, -0.055 * gLen, 0.016)
+    primary.push(body)
+    group.add(body)
+    const orbGeo = new THREE.SphereGeometry(rr * 1.22, seg, seg)
+    geos.push(orbGeo)
+    const orb = new THREE.Mesh(orbGeo, fixedMaterial(PLACEHOLDER))
+    orb.position.set(0, -0.105 * gLen, 0.055)
+    accent.push(orb)
+    group.add(orb)
+    return { group, zones: { primary, accent }, anchors: {}, dispose: () => geos.forEach((geo) => geo.dispose()) }
+  }
+
+  if (partId === 'grip_hook') {
+    // 아래로 내려갔다 뒤로 둥글게 말리는 루프형 손잡이
+    const curve = new THREE.CatmullRomCurve3([
+      new THREE.Vector3(0, 0.005, 0),
+      new THREE.Vector3(0, -0.045 * gLen, 0.005),
+      new THREE.Vector3(0, -0.1 * gLen, 0.025),
+      new THREE.Vector3(0, -0.075 * gLen, 0.065),
+    ], false, 'centripetal')
+    const hookGeo = new THREE.TubeGeometry(curve, seg * 2, 0.016 * gThick, Math.max(6, seg - 2), false)
+    geos.push(hookGeo)
+    const hook = new THREE.Mesh(hookGeo, fixedMaterial(PLACEHOLDER))
+    primary.push(hook)
+    group.add(hook)
+    const beadGeo = new THREE.SphereGeometry(0.021 * gThick, seg, seg)
+    geos.push(beadGeo)
+    const bead = new THREE.Mesh(beadGeo, fixedMaterial(PLACEHOLDER))
+    bead.position.set(0, -0.075 * gLen, 0.065)
+    accent.push(bead)
+    group.add(bead)
+    return { group, zones: { primary, accent }, anchors: {}, dispose: () => geos.forEach((geo) => geo.dispose()) }
+  }
+
+  if (partId === 'grip_racer') {
+    // 뒤로 기운 매끈한 손잡이 + 얇은 지느러미
+    const rr = 0.022 * gThick
+    const ang = 0.3 + gAng * 0.28
+    const bodyGeo = new THREE.CapsuleGeometry(rr, 0.095 * gLen, 3, seg)
+    geos.push(bodyGeo)
+    const body = new THREE.Mesh(bodyGeo, fixedMaterial(PLACEHOLDER))
+    body.rotation.x = ang
+    body.position.set(0, -0.057 * gLen, 0.015)
+    primary.push(body)
+    group.add(body)
+    const finGeo = new RoundedBoxGeometry(0.012, 0.058 * gLen, 0.045 * gThick, 2, 0.005)
+    geos.push(finGeo)
+    const fin = new THREE.Mesh(finGeo, fixedMaterial(PLACEHOLDER))
+    fin.rotation.x = ang
+    fin.position.set(0, -0.06 * gLen, 0.038)
+    accent.push(fin)
+    group.add(fin)
+    return { group, zones: { primary, accent }, anchors: {}, dispose: () => geos.forEach((geo) => geo.dispose()) }
+  }
+
   // ── 리볼버 그립 — 뒤로 둥글게 말린 서부식 손잡이(둥근 뒤꿈치) ──
   if (partId === 'grip_revolver') {
     const rgr = 0.028 * gThick
@@ -533,9 +871,9 @@ function buildGrip(partId: PartId, opts: BuildOpts): BuiltPart {
     }
   }
 
-  const gr = (banana ? 0.026 : 0.024) * gThick
+  const gr = (banana ? 0.026 : chunky ? 0.032 : 0.024) * gThick
 
-  const gripGeo = new THREE.CapsuleGeometry(gr, 0.09 * gLen, 3, seg)
+  const gripGeo = new THREE.CapsuleGeometry(gr, (chunky ? 0.075 : 0.09) * gLen, 3, seg)
   geos.push(gripGeo)
   const gAngle = gAng + (banana ? 0.14 : 0)
   // 캡슐 상단을 몸통 밑면(y=0)에 살짝 겹치게 — 아래로만 자라 항상 붙는다(공중부양 방지)
@@ -556,6 +894,15 @@ function buildGrip(partId: PartId, opts: BuildOpts): BuiltPart {
     group.add(k)
   }
 
+  if (chunky) {
+    const bumperGeo = new THREE.SphereGeometry(gr * 1.18, seg, seg)
+    geos.push(bumperGeo)
+    const bumper = new THREE.Mesh(bumperGeo, fixedMaterial(PLACEHOLDER))
+    bumper.position.set(0, gy - 0.042 * gLen, 0.024)
+    accent.push(bumper)
+    group.add(bumper)
+  }
+
   return {
     group,
     zones: { primary, accent },
@@ -574,7 +921,140 @@ function buildStock(partId: PartId, opts: BuildOpts): BuiltPart {
   const sLen = morphLerp('stockLength', resolveMorph(opts.morph, 'stockLength'))
   const sTh = morphLerp('stockThick', resolveMorph(opts.morph, 'stockThick'))
 
-  if (partId === 'stock_balloon') {
+  if (partId === 'stock_comet') {
+    // 길게 뻗은 둥근 꼬리 + 별구슬 쿠션
+    const armGeo = new THREE.CapsuleGeometry(0.024 * sTh, 0.16 * sLen, 3, seg)
+    armGeo.rotateX(Math.PI / 2)
+    geos.push(armGeo)
+    const arm = new THREE.Mesh(armGeo, fixedMaterial(PLACEHOLDER))
+    arm.position.z = 0.08 * sLen - 0.01
+    primary.push(arm)
+    group.add(arm)
+    const orbGeo = new THREE.SphereGeometry(0.052 * sTh, seg, seg)
+    geos.push(orbGeo)
+    const orb = new THREE.Mesh(orbGeo, fixedMaterial(PLACEHOLDER))
+    orb.scale.y = 1.25
+    orb.position.z = 0.18 * sLen
+    secondary.push(orb)
+    group.add(orb)
+  } else if (partId === 'stock_turbine') {
+    // 평행한 두 지지대 + 넓은 원형 쿠션
+    const armGeo = new THREE.CapsuleGeometry(0.014 * sTh, 0.14 * sLen, 3, seg)
+    armGeo.rotateX(Math.PI / 2)
+    geos.push(armGeo)
+    for (const sx of [-1, 1]) {
+      const arm = new THREE.Mesh(armGeo, fixedMaterial(PLACEHOLDER))
+      arm.position.set(sx * 0.035 * sTh, 0, 0.07 * sLen - 0.008)
+      primary.push(arm)
+      group.add(arm)
+    }
+    const padGeo = new THREE.CylinderGeometry(0.072 * sTh, 0.072 * sTh, 0.035, seg)
+    padGeo.rotateX(Math.PI / 2)
+    geos.push(padGeo)
+    const pad = new THREE.Mesh(padGeo, fixedMaterial(PLACEHOLDER))
+    pad.scale.y = 1.2
+    pad.position.z = 0.15 * sLen
+    secondary.push(pad)
+    group.add(pad)
+  } else if (partId === 'stock_buzz') {
+    // 몸통 뒤에 바로 붙는 초소형 방울
+    const buzzGeo = new THREE.SphereGeometry(0.052 * sTh, seg, seg)
+    geos.push(buzzGeo)
+    const buzz = new THREE.Mesh(buzzGeo, fixedMaterial(PLACEHOLDER))
+    buzz.scale.set(1.1, 1, 1.25 * sLen)
+    buzz.position.z = 0.055 * sLen - 0.008
+    primary.push(buzz)
+    group.add(buzz)
+  } else if (partId === 'stock_reverse') {
+    // 큰 고리와 뒤쪽 말랑 방울
+    const loopGeo = new THREE.TorusGeometry(0.052 * sTh, 0.012 * sTh, 7, seg)
+    geos.push(loopGeo)
+    const loop = new THREE.Mesh(loopGeo, fixedMaterial(PLACEHOLDER))
+    loop.scale.y = 1.18
+    loop.position.z = 0.09 * sLen
+    primary.push(loop)
+    group.add(loop)
+    const orbGeo = new THREE.SphereGeometry(0.032 * sTh, seg, seg)
+    geos.push(orbGeo)
+    const orb = new THREE.Mesh(orbGeo, fixedMaterial(PLACEHOLDER))
+    orb.position.set(0, -0.055 * sTh, 0.15 * sLen)
+    secondary.push(orb)
+    group.add(orb)
+  } else if (partId === 'stock_wire') {
+    // 위·아래 선이 뒤에서 만나는 둥근 접이 고리
+    const zEnd = 0.17 * sLen
+    const loopCurve = new THREE.CatmullRomCurve3([
+      new THREE.Vector3(0, 0, -0.008),
+      new THREE.Vector3(0, 0.065 * sTh, zEnd * 0.48),
+      new THREE.Vector3(0, 0.052 * sTh, zEnd),
+      new THREE.Vector3(0, -0.052 * sTh, zEnd),
+      new THREE.Vector3(0, -0.065 * sTh, zEnd * 0.48),
+      new THREE.Vector3(0, 0, -0.008),
+    ], true, 'centripetal')
+    const loopGeo = new THREE.TubeGeometry(loopCurve, seg * 2, 0.009 * sTh, Math.max(6, seg - 2), true)
+    geos.push(loopGeo)
+    const loop = new THREE.Mesh(loopGeo, fixedMaterial(PLACEHOLDER))
+    primary.push(loop)
+    group.add(loop)
+    const padGeo = new THREE.CapsuleGeometry(0.018 * sTh, 0.085 * sTh, 3, seg)
+    geos.push(padGeo)
+    const pad = new THREE.Mesh(padGeo, fixedMaterial(PLACEHOLDER))
+    pad.position.set(0, 0, zEnd)
+    secondary.push(pad)
+    group.add(pad)
+  } else if (partId === 'stock_racer') {
+    // 낮은 알약형 지지대 + 납작한 지느러미 쿠션
+    const armGeo = new THREE.CapsuleGeometry(0.02 * sTh, 0.13 * sLen, 3, seg)
+    armGeo.rotateX(Math.PI / 2)
+    geos.push(armGeo)
+    const arm = new THREE.Mesh(armGeo, fixedMaterial(PLACEHOLDER))
+    arm.position.set(0, -0.018, 0.065 * sLen - 0.008)
+    primary.push(arm)
+    group.add(arm)
+    const finGeo = new RoundedBoxGeometry(0.045 * sTh, 0.075 * sTh, 0.07, 2, 0.012)
+    geos.push(finGeo)
+    const fin = new THREE.Mesh(finGeo, fixedMaterial(PLACEHOLDER))
+    fin.position.set(0, 0.015, 0.14 * sLen)
+    fin.rotation.x = -0.25
+    secondary.push(fin)
+    group.add(fin)
+  } else if (partId === 'stock_spring') {
+    // 둥근 중심축을 감싸는 세 개의 통통한 스프링 고리
+    const armGeo = new THREE.CapsuleGeometry(0.018 * sTh, 0.14 * sLen, 3, seg)
+    armGeo.rotateX(Math.PI / 2)
+    geos.push(armGeo)
+    const arm = new THREE.Mesh(armGeo, fixedMaterial(PLACEHOLDER))
+    arm.position.z = 0.07 * sLen - 0.008
+    primary.push(arm)
+    group.add(arm)
+    const ringGeo = new THREE.TorusGeometry(0.038 * sTh, 0.009 * sTh, 7, seg)
+    geos.push(ringGeo)
+    for (let i = 0; i < 3; i++) {
+      const ring = new THREE.Mesh(ringGeo, fixedMaterial(PLACEHOLDER))
+      ring.position.z = (0.045 + i * 0.04) * sLen
+      secondary.push(ring)
+      group.add(ring)
+    }
+  } else if (partId === 'stock_skeleton') {
+    // 두 개의 열린 지지대와 도넛형 끝 받침
+    const armGeo = new THREE.CapsuleGeometry(0.011 * sTh, 0.15 * sLen, 3, seg)
+    armGeo.rotateX(Math.PI / 2)
+    geos.push(armGeo)
+    for (const sy of [-1, 1]) {
+      const arm = new THREE.Mesh(armGeo, fixedMaterial(PLACEHOLDER))
+      arm.position.set(0, sy * 0.032 * sTh, 0.075 * sLen - 0.008)
+      arm.rotation.x = sy * 0.12
+      primary.push(arm)
+      group.add(arm)
+    }
+    const padGeo = new THREE.TorusGeometry(0.046 * sTh, 0.012 * sTh, 7, seg)
+    geos.push(padGeo)
+    const pad = new THREE.Mesh(padGeo, fixedMaterial(PLACEHOLDER))
+    pad.scale.y = 1.18
+    pad.position.z = 0.155 * sLen
+    secondary.push(pad)
+    group.add(pad)
+  } else if (partId === 'stock_balloon') {
     // 풍선 스톡 — 큰 구 (뒤로 매달림)
     const balloonGeo = new THREE.SphereGeometry(0.075 * sTh, seg, seg)
     geos.push(balloonGeo)
@@ -618,7 +1098,83 @@ function buildMuzzle(partId: PartId, opts: BuildOpts): BuiltPart {
   const mz = morphLerp('muzzleSize', resolveMorph(opts.morph, 'muzzleSize'))
   const ml = morphLerp('muzzleLength', resolveMorph(opts.morph, 'muzzleLength'))
 
-  if (partId === 'muzzle_booster') {
+  if (partId === 'muzzle_comet') {
+    // 둥근 베이스 + 세 겹 도넛 + 고정 주황 안전 구슬
+    const baseGeo = new THREE.CylinderGeometry(0.032 * mz, 0.032 * mz, 0.07 * ml, seg)
+    baseGeo.rotateX(Math.PI / 2)
+    geos.push(baseGeo)
+    const base = new THREE.Mesh(baseGeo, fixedMaterial(PLACEHOLDER))
+    base.position.z = -0.035 * ml
+    primary.push(base)
+    group.add(base)
+    const ringGeo = new THREE.TorusGeometry(0.04 * mz, 0.006 * mz, 7, seg)
+    geos.push(ringGeo)
+    for (let i = 0; i < 3; i++) {
+      const ring = new THREE.Mesh(ringGeo, fixedMaterial(PLACEHOLDER))
+      ring.position.z = -0.018 * ml - i * 0.025 * ml
+      accent.push(ring)
+      group.add(ring)
+    }
+    const orbGeo = new THREE.SphereGeometry(0.022 * mz, seg, Math.max(6, seg - 2))
+    geos.push(orbGeo)
+    const orb = new THREE.Mesh(orbGeo, fixedMaterial(0xff8a2b))
+    orb.position.z = -0.085 * ml
+    group.add(orb)
+  } else if (partId === 'muzzle_turbine') {
+    // 굵은 중심 링 주위를 도는 네 개의 주황 동력 방울
+    const baseGeo = new THREE.CylinderGeometry(0.05 * mz, 0.043 * mz, 0.065 * ml, seg)
+    baseGeo.rotateX(Math.PI / 2)
+    geos.push(baseGeo)
+    const base = new THREE.Mesh(baseGeo, fixedMaterial(PLACEHOLDER))
+    base.position.z = -0.0325 * ml
+    primary.push(base)
+    group.add(base)
+    const ringGeo = new THREE.TorusGeometry(0.058 * mz, 0.009 * mz, 7, seg)
+    geos.push(ringGeo)
+    const ring = new THREE.Mesh(ringGeo, fixedMaterial(PLACEHOLDER))
+    ring.position.z = -0.064 * ml
+    accent.push(ring)
+    group.add(ring)
+    const orbGeo = new THREE.SphereGeometry(0.012 * mz, Math.max(8, seg - 2), Math.max(6, seg - 4))
+    geos.push(orbGeo)
+    for (let i = 0; i < 4; i++) {
+      const a = (i / 4) * Math.PI * 2
+      const orb = new THREE.Mesh(orbGeo, fixedMaterial(0xff8a2b))
+      orb.position.set(Math.cos(a) * 0.058 * mz, Math.sin(a) * 0.058 * mz, -0.068 * ml)
+      group.add(orb)
+    }
+  } else if (partId === 'muzzle_duo') {
+    // 나란한 두 안전 팁. 트윈 튜브와 섞어도 과장된 토이 얼굴처럼 보인다.
+    const tubeGeo = new THREE.CylinderGeometry(0.027 * mz, 0.027 * mz, 0.06 * ml, seg)
+    tubeGeo.rotateX(Math.PI / 2)
+    geos.push(tubeGeo)
+    const ringGeo = new THREE.TorusGeometry(0.03 * mz, 0.007 * mz, 7, seg)
+    geos.push(ringGeo)
+    for (const sx of [-1, 1]) {
+      const tube = new THREE.Mesh(tubeGeo, fixedMaterial(PLACEHOLDER))
+      tube.position.set(sx * 0.036 * mz, 0, -0.03 * ml)
+      primary.push(tube)
+      group.add(tube)
+      const ring = new THREE.Mesh(ringGeo, fixedMaterial(0xff8a2b))
+      ring.position.set(sx * 0.036 * mz, 0, -0.06 * ml)
+      group.add(ring)
+    }
+  } else if (partId === 'muzzle_bubble') {
+    // 통통한 방울 셸 + 주황 안전 립
+    const bubbleGeo = new THREE.SphereGeometry(0.055 * mz, seg, Math.max(8, seg - 2), 0, Math.PI * 2, 0, Math.PI * 0.72)
+    geos.push(bubbleGeo)
+    const bubble = new THREE.Mesh(bubbleGeo, fixedMaterial(PLACEHOLDER))
+    bubble.scale.z = 1.15 * ml
+    bubble.rotation.x = Math.PI
+    bubble.position.z = -0.025 * ml
+    primary.push(bubble)
+    group.add(bubble)
+    const lipGeo = new THREE.TorusGeometry(0.043 * mz, 0.009 * mz, 8, seg)
+    geos.push(lipGeo)
+    const lip = new THREE.Mesh(lipGeo, fixedMaterial(0xff8a2b))
+    lip.position.z = -0.075 * ml
+    group.add(lip)
+  } else if (partId === 'muzzle_booster') {
     const coneGeo = new THREE.CylinderGeometry(0.055 * mz, 0.04 * mz, 0.08 * ml, seg)
     coneGeo.rotateX(Math.PI / 2)
     geos.push(coneGeo)
@@ -653,6 +1209,23 @@ function buildMuzzle(partId: PartId, opts: BuildOpts): BuiltPart {
     star.position.set(0, 0, -0.04 * ml - 0.021 * mz)
     accent.push(star)
     group.add(star)
+  } else if (partId === 'muzzle_ring') {
+    // 도넛 링 — 짧은 둥근 목 + 앞뒤로 겹친 두 고리
+    const neckGeo = new THREE.CylinderGeometry(0.03 * mz, 0.03 * mz, 0.045 * ml, seg)
+    neckGeo.rotateX(Math.PI / 2)
+    geos.push(neckGeo)
+    const neck = new THREE.Mesh(neckGeo, fixedMaterial(PLACEHOLDER))
+    neck.position.z = -0.0225 * ml
+    primary.push(neck)
+    group.add(neck)
+    const ringGeo = new THREE.TorusGeometry(0.052 * mz, 0.011 * mz, 8, seg)
+    geos.push(ringGeo)
+    for (const z of [-0.04 * ml, -0.065 * ml]) {
+      const ring = new THREE.Mesh(ringGeo, fixedMaterial(z < -0.05 * ml ? 0xff8a2b : PLACEHOLDER))
+      ring.position.z = z
+      if (z >= -0.05 * ml) accent.push(ring)
+      group.add(ring)
+    }
   } else {
     // 나팔 팁 — 트럼펫 모양 flare (넓은 벨 입구가 전방 -Z, 립 링과 정렬)
     const hornGeo = new THREE.CylinderGeometry(0.06 * mz, 0.035 * mz, 0.08 * ml, seg, 1, true)
@@ -688,7 +1261,88 @@ function buildMagazine(partId: PartId, opts: BuildOpts): BuiltPart {
   const sz = morphLerp('magSize', resolveMorph(opts.morph, 'magSize'))
   const ln = morphLerp('magLength', resolveMorph(opts.morph, 'magLength'))
 
-  if (partId === 'mag_rocket') {
+  if (partId === 'mag_powerbox') {
+    // 넓은 동력 상자 + 한쪽에 빛나는 셀 3개
+    const w = 0.095 * sz
+    const h = 0.14 * ln
+    const d = 0.075 * sz
+    const boxGeo = new RoundedBoxGeometry(w, h, d, 3, 0.018)
+    geos.push(boxGeo)
+    const box = new THREE.Mesh(boxGeo, fixedMaterial(PLACEHOLDER))
+    box.position.y = -h * 0.5
+    primary.push(box)
+    group.add(box)
+    const cellGeo = new THREE.CapsuleGeometry(0.011 * sz, h * 0.42, 3, Math.max(6, seg - 2))
+    geos.push(cellGeo)
+    for (let i = 0; i < 3; i++) {
+      const cell = new THREE.Mesh(cellGeo, glowMaterial(0x74f0c5))
+      cell.position.set(w * 0.5 + 0.004, -h * 0.5, (i - 1) * d * 0.29)
+      group.add(cell)
+    }
+    const neckGeo = new RoundedBoxGeometry(w * 0.45, 0.03, d * 0.55, 2, 0.008)
+    geos.push(neckGeo)
+    const neck = new THREE.Mesh(neckGeo, fixedMaterial(PLACEHOLDER))
+    neck.position.y = -0.01
+    secondary.push(neck)
+    group.add(neck)
+  } else if (partId === 'mag_sidepod') {
+    // 오른쪽으로 비켜 달린 둥근 포드 + 연결 목
+    const R = 0.055 * sz
+    const podGeo = new THREE.SphereGeometry(R, seg, seg)
+    geos.push(podGeo)
+    const pod = new THREE.Mesh(podGeo, fixedMaterial(PLACEHOLDER))
+    pod.scale.set(1.15, 1.25 * ln, 0.9)
+    pod.position.set(R * 0.78, -R * 1.05, -0.025)
+    primary.push(pod)
+    group.add(pod)
+    const neckGeo = new THREE.CapsuleGeometry(0.014 * sz, 0.06 * sz, 3, seg)
+    neckGeo.rotateZ(Math.PI / 2)
+    geos.push(neckGeo)
+    const neck = new THREE.Mesh(neckGeo, fixedMaterial(PLACEHOLDER))
+    neck.rotation.z = -0.45
+    neck.position.set(R * 0.35, -0.025, -0.025)
+    secondary.push(neck)
+    group.add(neck)
+    const ringGeo = new THREE.TorusGeometry(R * 0.62, R * 0.11, 7, seg)
+    ringGeo.rotateY(Math.PI / 2)
+    geos.push(ringGeo)
+    const ring = new THREE.Mesh(ringGeo, fixedMaterial(PLACEHOLDER))
+    ring.position.copy(pod.position)
+    secondary.push(ring)
+    group.add(ring)
+  } else if (partId === 'mag_duo') {
+    // 작은 알약 팩 두 개와 가운데 연결 다리
+    const packGeo = new THREE.CapsuleGeometry(0.025 * sz, 0.085 * ln, 3, seg)
+    geos.push(packGeo)
+    for (const sx of [-1, 1]) {
+      const pack = new THREE.Mesh(packGeo, fixedMaterial(PLACEHOLDER))
+      pack.position.set(sx * 0.032 * sz, -0.058 * ln, 0)
+      primary.push(pack)
+      group.add(pack)
+    }
+    const bridgeGeo = new RoundedBoxGeometry(0.07 * sz, 0.025, 0.04 * sz, 2, 0.008)
+    geos.push(bridgeGeo)
+    const bridge = new THREE.Mesh(bridgeGeo, fixedMaterial(PLACEHOLDER))
+    bridge.position.y = -0.01
+    secondary.push(bridge)
+    group.add(bridge)
+  } else if (partId === 'mag_pocket') {
+    // 아주 짧은 포켓 상자 + 주황 잔량 버튼
+    const w = 0.05 * sz
+    const h = 0.065 * ln
+    const d = 0.055 * sz
+    const packGeo = new RoundedBoxGeometry(w, h, d, 3, 0.014)
+    geos.push(packGeo)
+    const pack = new THREE.Mesh(packGeo, fixedMaterial(PLACEHOLDER))
+    pack.position.y = -h * 0.48
+    primary.push(pack)
+    group.add(pack)
+    const buttonGeo = new THREE.SphereGeometry(0.009 * sz, 8, 6)
+    geos.push(buttonGeo)
+    const button = new THREE.Mesh(buttonGeo, fixedMaterial(0xff8a2b))
+    button.position.set(w * 0.5, -h * 0.48, -d * 0.2)
+    group.add(button)
+  } else if (partId === 'mag_rocket') {
     // 로켓 다트 — 몸통 아래 매달린 커다란 토이 로켓(축=Z, 앞으로 -Z). 둥근 몸체 + 주황 노즈 + 꼬리 지느러미.
     const R = 0.03 * sz * 1.3
     const len = 0.13 * ln
@@ -795,9 +1449,12 @@ function buildMagazine(partId: PartId, opts: BuildOpts): BuiltPart {
     group.add(neck)
   } else {
     // 미니 클립·스프링 팩·젤리 탱크 — 아래로 매달린 상자 (살짝 앞으로 기움)
-    const w = 0.05 * sz
-    const d = 0.07 * sz
-    const h = 0.13 * ln
+    const isMini = partId === 'mag_mini'
+    const isJelly = partId === 'mag_jelly'
+    const isSpring = partId === 'mag_spring'
+    const w = (isJelly ? 0.075 : isMini ? 0.042 : 0.05) * sz
+    const d = (isJelly ? 0.085 : isMini ? 0.052 : 0.07) * sz
+    const h = (isJelly ? 0.115 : isMini ? 0.075 : 0.13) * ln
     const tilt = 0.12
     const caseGeo = new RoundedBoxGeometry(w, h, d, 2, 0.012)
     geos.push(caseGeo)
@@ -822,6 +1479,25 @@ function buildMagazine(partId: PartId, opts: BuildOpts): BuiltPart {
       dart.rotation.x = tilt
       dart.position.set(w * 0.5 + 0.002, -h * (0.3 + i * 0.3), 0)
       group.add(dart)
+    }
+    if (isSpring) {
+      const coilGeo = new THREE.TorusGeometry(w * 0.58, 0.004 * sz, 6, seg)
+      coilGeo.rotateY(Math.PI / 2)
+      geos.push(coilGeo)
+      for (let i = 0; i < 3; i++) {
+        const coil = new THREE.Mesh(coilGeo, fixedMaterial(PLACEHOLDER))
+        coil.position.set(0, -h * (0.27 + i * 0.23), 0)
+        secondary.push(coil)
+        group.add(coil)
+      }
+    } else if (isJelly) {
+      const bubbleGeo = new THREE.SphereGeometry(0.014 * sz, 8, 6)
+      geos.push(bubbleGeo)
+      for (const z of [-d * 0.24, d * 0.24]) {
+        const bubble = new THREE.Mesh(bubbleGeo, glowMaterial(0x74f0c5))
+        bubble.position.set(-w * 0.28, -h * 0.58, z)
+        group.add(bubble)
+      }
     }
   }
 

@@ -144,6 +144,22 @@
 - 독립 슬롯이라 그립·스톡과 함께 장착할 수 있다. 전 몸통이 `strap` 소켓을 제공한다.
 - 스탯·발사 로직은 건드리지 않는 꾸미기 파츠이며, 미장착 상태가 기존 저장의 기본값이다.
 
+### 3.7 사용자 확장 — 가상 토이 7계열 (2026-07-21 현재 빌드)
+
+현실 장비의 이름·완성 형태를 복제하지 않고, 기능 인상만 자유 조립 가능한 토이 파츠로 분산했다. 현재 카탈로그는 **총 76종**이다.
+
+| 계열 | 몸통 | 함께 추가된 파츠 | 조립 인상 |
+|---|---|---|---|
+| 코멧 | `body_comet` | `barrel_comet`, `sight_comet`, `stock_comet`, `muzzle_comet` | 둥근 장축·별구슬·다중 고리 |
+| 터빈 | `body_turbine` | `barrel_turbine`, `grip_turbine`, `stock_turbine`, `mag_powerbox`, `muzzle_turbine` | 넓은 동력 휠·굵은 튜브·대용량 팩 |
+| 버즈 | `body_buzz` | `barrel_buzz`, `sight_bubble`, `grip_buzz`, `stock_buzz`, `mag_pocket` | 손바닥 크기·짧은 방울형 파츠·빠른 조작성 |
+| 리버스 | `body_reverse` | `barrel_reverse`, `sight_bridge`, `grip_reverse`, `stock_reverse`, `mag_sidepod` | 뒤쪽 동력 방울·측면 포드·균형형 |
+| 듀오 | `body_duo` | `barrel_twin` 기본 2열, `mag_duo`, `muzzle_duo` | 쌍둥이 볼·나란한 두 줄 |
+| 후크 | `body_hook` | `barrel_hook`, `grip_hook`, `stock_wire` | 둥근 갈고리·루프형 꼬리 |
+| 레이서 | `body_racer` | `barrel_racer`, `sight_fin`, `grip_racer`, `stock_racer`, `muzzle_bubble` | 낮은 지느러미·옆날개·매끈한 속도감 |
+
+슬롯별 현재 수량: 몸통 16 / 배럴 13 / 다트 팩 10 / 조준기 8 / 그립 10 / 꼬리 10 / 어깨끈 1 / 끝 장식 8. 모든 신규 ID는 시작 해금 목록·세이브 정규화·공방 선택·색칠·랜덤 조립의 범용 카탈로그 경로를 사용한다.
+
 ---
 
 ## 4. 밸런스 축 — 스탯 6개 + 파생 1개 (내부 정본, 결정문 3)
