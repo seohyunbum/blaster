@@ -195,24 +195,33 @@ const _vmBox = new THREE.Box3()
 const _vmSize = new THREE.Vector3()
 const _vmCenter = new THREE.Vector3()
 /**
- * 쏘기 화면 총(뷰모델)이 화면을 가리지 않게: 너무 큰 총(미니건 코어 등)은 자동 축소하고
- * 중심을 뷰모델 원점으로 당겨 화면 아래쪽에 걸치게 한다. 보통 크기 총은 건드리지 않는다.
+ * 쏘기 화면 총(뷰모델) 위치를 착용 파츠에 따라 조정 (사용자 요청 — 모든 총을 내리지 않는다).
+ * - 미니건 이름 파츠 다 착용(미니건 코어 + 미니건 손잡이): 크게 축소 + 화면 아래로 쭉 내림.
+ * - 리볼버 파츠 착용(리볼버 실린더/그립): 조금만 아래로.
+ * - 그 외: 기존 위치·크기 그대로.
  */
 function fitViewmodel(g: THREE.Object3D): void {
   g.scale.setScalar(1)
   g.position.set(0, 0, 0)
-  g.updateMatrixWorld(true)
-  _vmBox.setFromObject(g)
-  _vmBox.getSize(_vmSize)
-  _vmBox.getCenter(_vmCenter)
-  // 화면을 가리는 건 가로·세로(x·y)다. 깊이(z=길이)는 멀어지는 방향이라 화면을 안 가림 → 제외.
-  const screenDim = Math.max(_vmSize.x, _vmSize.y)
-  const TARGET = 0.34 // 화면에서 총이 차지할 최대 가로·세로 (보통 총 0.27~0.30 = 그대로, 미니건 0.6 = 축소)
-  if (screenDim <= TARGET) return // 보통 총은 기존 위치·크기 그대로
-  const s = TARGET / screenDim
-  g.scale.setScalar(s)
-  // 총 윗부분이 뷰모델 원점(화면 하단) 근처에 오도록 아래로 매달아 배치 → 큰 총이 시야를 안 가림
-  g.position.set(-_vmCenter.x * s, -(_vmCenter.y + _vmSize.y / 2) * s, -_vmCenter.z * s)
+  const bodyId = active.parts.body?.partId
+  const gripId = active.parts.grip?.partId
+  const magId = active.parts.magazine?.partId
+  const isFullMinigun = bodyId === 'body_minigun' && gripId === 'grip_minigun'
+  const hasRevolver = gripId === 'grip_revolver' || magId === 'mag_revolver'
+  if (isFullMinigun) {
+    g.updateMatrixWorld(true)
+    _vmBox.setFromObject(g)
+    _vmBox.getSize(_vmSize)
+    _vmBox.getCenter(_vmCenter)
+    // 화면 가리는 가로·세로(x·y) 기준 축소(깊이 z 제외). 총 윗부분이 화면 하단에 오도록 매달기.
+    const screenDim = Math.max(_vmSize.x, _vmSize.y)
+    const TARGET = 0.34
+    const s = screenDim > TARGET ? TARGET / screenDim : 1
+    g.scale.setScalar(s)
+    g.position.set(-_vmCenter.x * s, -(_vmCenter.y + _vmSize.y / 2) * s, -_vmCenter.z * s)
+  } else if (hasRevolver) {
+    g.position.y = -0.08 // 조금만 아래로
+  }
 }
 
 function rebuildViewmodel(): void {
