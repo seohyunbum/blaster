@@ -28,6 +28,7 @@ test('roundtrip: morph 포함 저장→로드 deepEqual (핵심 필드)', () => 
       body: makeInstance('body_popcorn', { bodyLength: 0.8, bodyChub: 0.3 }),
       barrel: makeInstance('barrel_rail', { barrelLength: 1 }),
       sight: makeInstance('sight_dot'),
+      strap: makeInstance('strap_comfy'),
     },
   }
   const save = createDefaultSave(1)
@@ -43,6 +44,7 @@ test('roundtrip: morph 포함 저장→로드 deepEqual (핵심 필드)', () => 
   assert.deepEqual(lb.parts.body!.morph, { bodyLength: 0.8, bodyChub: 0.3 })
   assert.deepEqual(lb.parts.barrel!.morph, { barrelLength: 1 })
   assert.deepEqual(lb.parts.sight!.morph, {})
+  assert.equal(lb.parts.strap!.partId, 'strap_comfy')
 })
 
 test('미지 MorphKey 는 조용히 무시(하위 호환)', () => {

@@ -27,6 +27,7 @@ const SLOT_TABS: { slot: SlotType; label: string }[] = [
   { slot: 'sight', label: '조준기' },
   { slot: 'grip', label: '그립' },
   { slot: 'stock', label: '스톡' },
+  { slot: 'strap', label: '어깨끈' },
   { slot: 'muzzle', label: '총구' },
 ]
 

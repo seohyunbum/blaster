@@ -37,6 +37,7 @@
 | grip (그립) | M2 | 아래로 기운 손잡이 | Capsule r0.028 L0.09 를 **X축 +15° 회전(하단이 +Z 후방으로 기울게)** + 손가락 굴곡 Torus 2개 | 캡슐 본체 = primary / 손가락 굴곡 = accent |
 | stock (개머리) | M2 | 뒤로 뻗는 두 번째 덩어리 | Box 0.05×0.10×0.22 + 엉덩이판 RoundedBox | 본체 = primary / 엉덩이판 = secondary |
 | mag (다트 팩) | M2 | 아래로 매달린 상자 | RoundedBox 0.05×0.16×0.08 5° 전방 기울임(X축) + 투명창 Box(opacity 0.5) 안에 다트색 Capsule 3개 | 케이스 = primary / **투명창·다트 캡슐 = 고정(비색칠, 다트색은 탄 종류 표시)** |
+| strap (어깨끈) | 현재 | 몸통 옆에서 아래로 늘어진 U자 끈 | 오른쪽 측면 앞·뒤 점을 CatmullRomCurve3 + TubeGeometry로 연결 + 체결 Torus 2개. 몸통 길이 morph에 맞춰 Z·Y 스케일 보정 | 끈 = primary / 앞·뒤 체결 고리 = accent |
 | muzzle (총구 액세서리) | M2 | 앞끝 포인트 장식 | 나팔 Cone(첨단 Sphere 캡) / 스펀지 안전팁 Sphere r0.045 | 나팔 = primary / **주황 안전팁 = 고정(비색칠, #ff7a1a)** |
 
 - 파츠당 메시 수 **≤6 (수치 정본 = 07 성능 예산 표, 결정문 23)** — verify 게이트 단위테스트로 강제: `countMeshes(buildPart(id, opts).group) <= 6` (§8). **morph 극단값에서도 재검사**한다 — morph 는 메시 수를 바꾸지 않는다 (09 §3.5).
@@ -50,8 +51,8 @@
 
 ```ts
 // SocketId 문자열 = 슬롯명과 동일 (결정문 2): barrel 마운트 소켓 = "barrel"
-type SocketId = "barrel" | "sight" | "grip" | "stock" | "mag";
-type PartCategory = "body" | "barrel" | "sight" | "grip" | "stock" | "mag" | "muzzle";
+type SocketId = "barrel" | "sight" | "grip" | "stock" | "mag" | "strap";
+type PartCategory = "body" | "barrel" | "sight" | "grip" | "stock" | "mag" | "strap" | "muzzle";
 
 interface SocketDef {
   id: SocketId;
@@ -66,6 +67,7 @@ const BODY_POPCORN_SOCKETS: SocketDef[] = [
   { id: "grip",   position: [0, -0.06,  0.10], accepts: "grip" },   // 파츠는 M2, 소켓은 지금 정의
   { id: "stock",  position: [0,  0.01,  0.22], accepts: "stock" },
   { id: "mag",    position: [0, -0.08, -0.04], accepts: "mag" },
+  { id: "strap",  position: [0.066, 0.032, 0],  accepts: "strap" }, // 오른쪽 측면, 실제 값은 morph 치수 비례
 ];
 ```
 
@@ -73,11 +75,11 @@ const BODY_POPCORN_SOCKETS: SocketDef[] = [
 - **"빈 소켓 = 없는 소켓" 표현 규칙** (결정문 17, 03 소유): 빈 소켓에 상시 마커·구멍·스터브를 그리지 않는다 — 파츠가 없으면 그 자리는 매끈한 몸통이다. 부착 인터랙션 중의 고스트 구 펄스(§6)는 조립 UI 컨텍스트 한정(상세 UX = 06).
 - **필수 슬롯 = body 만** (결정문 16): 맨몸(몸통 단독)이 완성 실루엣으로 성립해야 한다 — 캐리핸들·방아쇠울이 몸통 소속인 이유.
 - **총구 액세서리(muzzle, M2)는 바디 소켓이 아니다** — 배럴 빌더가 반환하는 총구 끝 앵커에 부착되어, `barrelLength` morph 로 배럴이 늘면 같이 전진한다 (정본 = 09 §3.3).
-- **소켓 앵커는 morph 를 따라간다**: 몸통 빌더가 morph 반영 좌표의 앵커(`anchors`)를 반환한다 — `bodyLength` t=1 이면 barrel 소켓 z 전진, grip·mag 앵커는 비례 위치 유지 (정본 = 09 §3.3, 계약 = §3.1 BuiltPart).
+- **소켓 앵커는 morph 를 따라간다**: 몸통 빌더가 morph 반영 좌표의 앵커(`anchors`)를 반환한다 — `bodyLength` t=1 이면 barrel 소켓 z 전진, grip·mag 앵커는 비례 위치 유지, strap 앵커는 앞·뒤 체결 간격과 늘어짐을 몸통 길이에 맞춰 스케일한다 (정본 = 09 §3.3, 계약 = §3.1 BuiltPart).
 
 ### 1.4 파츠 id 규약 · 표시명 정책
 
-- **id 규약 (03 소유, 결정문 7)**: `{category}_{name}` 소문자 스네이크 — `body_popcorn`, `body_bulldog`, `barrel_snap`, `barrel_rail`, `sight_dot`.
+- **id 규약 (03 소유, 결정문 7)**: `{category}_{name}` 소문자 스네이크 — `body_popcorn`, `body_bulldog`, `barrel_snap`, `barrel_rail`, `sight_dot`, `strap_comfy`.
 - **로스터·스탯 델타·한글 표시명 정본 = 02 §3** (결정문 7). M1 로스터 = 몸통 2(팝콘·불도그) + 배럴 2(숏 스냅·롱 레일) + 사이트 1(도트) = **5종 + 맨몸** (결정문 21, 탄창은 M2 — 한글 표시 "다트 팩", 결정문 2). 표시명은 아들 네이밍 세션에서 교체 가능(명기) — 표시명 테이블 교체만으로 비용 0.
 - **금칙어 리스트 단일 정본 = 08 §3.1** (결정문 25 — 03 의 구 자체 목록은 08 로 병합됨). **verify 게이트**: 모든 partId·displayName·UI 문자열·**morph 슬라이더 라벨**(09)을 08 §3.1 리스트로 스캔해 하나라도 걸리면 빌드 실패. 이름을 짓는 순간이 아니라 빌드 시점에 기계가 막는다.
 - 가드레일 "가상의 장난감 이름만"은 설계 라벨 단계부터 적용 — 내부 설계명은 partId·UI 표시명으로 흘러가는 게 기본 경로이므로 전 층위에서 실총 유형 단어를 배제한다.

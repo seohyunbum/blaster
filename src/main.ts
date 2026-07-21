@@ -510,7 +510,7 @@ function randomizeAll(): void {
   // 몸통은 필수, 나머지는 확률적으로 (없는 것도 하나의 변형)
   const bodyId = pick(partsForSlot('body')).id
   next.body = { partId: bodyId, paint: randomPaint(), morph: randomMorphFor('body') }
-  for (const slot of ['barrel', 'sight', 'grip', 'stock', 'muzzle'] as SlotType[]) {
+  for (const slot of ['barrel', 'sight', 'grip', 'stock', 'strap', 'muzzle'] as SlotType[]) {
     const opts = partsForSlot(slot)
     if (opts.length === 0) continue
     if (Math.random() < 0.22) continue // 가끔은 비워 둔다

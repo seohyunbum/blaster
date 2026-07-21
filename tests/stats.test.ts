@@ -138,3 +138,12 @@ test('총구가 많을수록 연사가 빨라진다 (사용자 요청)', () => {
   assert.ok(s6.fireRate > s1.fireRate, `연사가 안 올라감: ${s1.fireRate} → ${s6.fireRate}`)
   assert.equal(s6.fireRateRaw - s1.fireRateRaw, 5) // 총구 6개 = 1개 초과분 5 × +1
 })
+
+test('말랑 어깨끈은 꾸미기 파츠라 발사·조작성 스탯을 바꾸지 않는다', () => {
+  const base = bare('body_bulldog')
+  const withStrap: Blaster = {
+    ...base,
+    parts: { ...base.parts, strap: makeInstance('strap_comfy') },
+  }
+  assert.deepEqual(computeStats(withStrap), computeStats(base))
+})

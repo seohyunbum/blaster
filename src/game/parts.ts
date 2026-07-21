@@ -23,7 +23,7 @@ export const BODIES: readonly BodyDef[] = [
     delta: {},
     base: { power: 3, fireRate: 6, accuracy: 4, weight: 2 },
     weightLimit: 6,
-    sockets: ['barrel', 'sight', 'grip', 'stock', 'muzzle', 'magazine'],
+    sockets: ['barrel', 'sight', 'grip', 'stock', 'muzzle', 'magazine', 'strap'],
   },
   {
     id: 'body_bulldog',
@@ -33,7 +33,7 @@ export const BODIES: readonly BodyDef[] = [
     delta: {},
     base: { power: 5, fireRate: 4, accuracy: 5, weight: 4 },
     weightLimit: 9,
-    sockets: ['barrel', 'sight', 'grip', 'stock', 'muzzle', 'magazine'],
+    sockets: ['barrel', 'sight', 'grip', 'stock', 'muzzle', 'magazine', 'strap'],
   },
   {
     id: 'body_titan',
@@ -43,7 +43,7 @@ export const BODIES: readonly BodyDef[] = [
     delta: {},
     base: { power: 7, fireRate: 2, accuracy: 6, weight: 6 },
     weightLimit: 12,
-    sockets: ['barrel', 'sight', 'grip', 'stock', 'muzzle', 'magazine'],
+    sockets: ['barrel', 'sight', 'grip', 'stock', 'muzzle', 'magazine', 'strap'],
   },
   {
     id: 'body_jelly',
@@ -53,7 +53,7 @@ export const BODIES: readonly BodyDef[] = [
     delta: {},
     base: { power: 4, fireRate: 5, accuracy: 3, weight: 3 },
     weightLimit: 8,
-    sockets: ['barrel', 'sight', 'grip', 'stock', 'muzzle', 'magazine'],
+    sockets: ['barrel', 'sight', 'grip', 'stock', 'muzzle', 'magazine', 'strap'],
   },
   {
     id: 'body_rocket',
@@ -63,7 +63,7 @@ export const BODIES: readonly BodyDef[] = [
     delta: {},
     base: { power: 5, fireRate: 5, accuracy: 6, weight: 4 },
     weightLimit: 9,
-    sockets: ['barrel', 'sight', 'grip', 'stock', 'muzzle', 'magazine'],
+    sockets: ['barrel', 'sight', 'grip', 'stock', 'muzzle', 'magazine', 'strap'],
   },
   {
     id: 'body_orb',
@@ -73,7 +73,7 @@ export const BODIES: readonly BodyDef[] = [
     delta: {},
     base: { power: 4, fireRate: 7, accuracy: 3, weight: 3 },
     weightLimit: 7,
-    sockets: ['barrel', 'sight', 'grip', 'stock', 'muzzle', 'magazine'],
+    sockets: ['barrel', 'sight', 'grip', 'stock', 'muzzle', 'magazine', 'strap'],
   },
   {
     id: 'body_wedge',
@@ -83,7 +83,7 @@ export const BODIES: readonly BodyDef[] = [
     delta: {},
     base: { power: 4, fireRate: 7, accuracy: 5, weight: 3 },
     weightLimit: 7,
-    sockets: ['barrel', 'sight', 'grip', 'stock', 'muzzle', 'magazine'],
+    sockets: ['barrel', 'sight', 'grip', 'stock', 'muzzle', 'magazine', 'strap'],
   },
   {
     id: 'body_chunk',
@@ -93,7 +93,7 @@ export const BODIES: readonly BodyDef[] = [
     delta: {},
     base: { power: 6, fireRate: 3, accuracy: 5, weight: 5 },
     weightLimit: 11,
-    sockets: ['barrel', 'sight', 'grip', 'stock', 'muzzle', 'magazine'],
+    sockets: ['barrel', 'sight', 'grip', 'stock', 'muzzle', 'magazine', 'strap'],
   },
   {
     id: 'body_minigun',
@@ -103,7 +103,7 @@ export const BODIES: readonly BodyDef[] = [
     delta: {},
     base: { power: 8, fireRate: 5, accuracy: 3, weight: 9 },
     weightLimit: 18,
-    sockets: ['barrel', 'sight', 'grip', 'stock', 'muzzle', 'magazine'],
+    sockets: ['barrel', 'sight', 'grip', 'stock', 'muzzle', 'magazine', 'strap'],
   },
 ]
 
@@ -307,6 +307,14 @@ export const PARTS: readonly PartDef[] = [
     nameKo: '뼈대 스톡',
     desc: '구멍 숭숭 뼈대 모양. 가볍고 멋져요',
     delta: { accuracy: 1 },
+  },
+  // 어깨끈 1종 — 몸통 오른쪽 측면의 앞·뒤 고리를 잇는 꾸미기 파츠
+  {
+    id: 'strap_comfy',
+    slot: 'strap',
+    nameKo: '말랑 어깨끈',
+    desc: '몸통 옆에 연결해 어깨에 편하게 멜 수 있는 폭신한 끈',
+    delta: {},
   },
   // 머즐 4종 (배럴 끝에 붙음)
   {

@@ -11,6 +11,7 @@ export type SlotType =
   | 'stock'
   | 'muzzle'
   | 'grip'
+  | 'strap'
   | 'special'
 
 export type SocketId = SlotType // 결정문 2 — 소켓 문자열 = 슬롯명

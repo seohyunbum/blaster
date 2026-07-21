@@ -82,6 +82,43 @@ test('다트 팩이 실제 메시로 지어지고 magSize morph 로 커진다', 
   drum.dispose()
 })
 
+test('말랑 어깨끈은 두 고리로 몸통 옆에 붙고 아래로 넉넉히 늘어진다', () => {
+  const strap = buildPart('strap_comfy', { morph: {} })
+  assert.equal(countMeshes(strap.group), 3, '끈 1 + 체결 고리 2 구성이 아님(폴백 의심)')
+  assert.ok((strap.zones.primary?.length ?? 0) >= 1, '끈 primary 존 없음')
+  assert.equal(strap.zones.accent?.length, 2, '앞·뒤 체결 고리 accent 존 누락')
+  const localBox = new THREE.Box3().setFromObject(strap.group)
+  assert.ok(localBox.min.y < -0.25, `끈이 충분히 아래로 늘어지지 않음: ${localBox.min.y}`)
+  strap.dispose()
+
+  // 전 몸통에서 morph 반영 strap 앵커에 실제 부착되고 몸통 아래까지 실루엣이 보여야 한다.
+  for (const body of BODIES) {
+    const assembled = buildBlaster({
+      id: 't', name: 't', createdAt: 0,
+      parts: { body: makeInstance(body.id), strap: makeInstance('strap_comfy') },
+    }, 'full')
+    const bodyOnly = buildBlaster({
+      id: 't', name: 't', createdAt: 0,
+      parts: { body: makeInstance(body.id) },
+    }, 'full')
+    assembled.group.updateWorldMatrix(false, true)
+    bodyOnly.group.updateWorldMatrix(false, true)
+    assert.ok(assembled.parts.strap, `${body.id}: strap 소켓에 부착 안 됨`)
+    const bodyBox = new THREE.Box3().setFromObject(bodyOnly.group)
+    const strapBox = new THREE.Box3().setFromObject(assembled.parts.strap!.group)
+    assert.ok(
+      strapBox.min.y < bodyBox.min.y - 0.07,
+      `${body.id}: 어깨끈 실루엣이 몸통 아래로 안 보임 (${strapBox.min.y} vs ${bodyBox.min.y})`,
+    )
+    assert.ok(
+      strapBox.min.x > bodyBox.max.x - 0.04,
+      `${body.id}: 어깨끈이 오른쪽 측면에서 벗어남 (${strapBox.min.x} vs ${bodyBox.max.x})`,
+    )
+    assembled.dispose()
+    bodyOnly.dispose()
+  }
+})
+
 test('미니건 손잡이는 위(+Y)로 자란다 — 몸통 위 장착용', () => {
   const mg = buildPart('grip_minigun', { morph: {} })
   const normal = buildPart('grip_mini', { morph: {} })
