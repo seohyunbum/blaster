@@ -220,7 +220,7 @@ function fitViewmodel(g: THREE.Object3D): void {
     g.scale.setScalar(s)
     g.position.set(-_vmCenter.x * s, -(_vmCenter.y + _vmSize.y / 2) * s, -_vmCenter.z * s)
   } else if (hasRevolver) {
-    g.position.y = -0.08 // 조금만 아래로
+    g.position.y = -0.05 // 조금만 아래로 (아주 살짝 위로 조정)
   }
 }
 
