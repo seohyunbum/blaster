@@ -154,3 +154,11 @@
 - **`grip_revolver` (리볼버 그립)**: 뒤로 젖힌 캡슐 + 둥근 뒤꿈치(heel) 공 + 링 장식. buildGrip 신규 분기(4메시). delta{accuracy+1}.
 - **가드레일**: `revolver`/`리볼버` 는 08 §3.1 금칙어 아님(vocab lint 통과). computeStats·세이브·HUD 다트 계기는 기존 magazine 배선 재사용(additive, 기존 저장 총 무영향).
 - **검증**: 64테스트·typecheck 통과. **실브라우저(Playwright) 확인** — 다트 팩 목록에 "리볼버 실린더 · 6발", 그립 목록에 "리볼버 그립" 노출·장착·렌더 정상, JS 에러 0, 실린더 앞 다트 링 가시.
+
+## 2026-07-19 — 총구 많을수록 연사 빠르게 (사용자 요청)
+
+10살 사용자 요청 "총구가 많을수록 연사가 빠르게".
+- **`parts.ts computeStats`**: 배럴 슬롯 처리 시 `barrelCountFromMorph(inst.morph)` 로 총구 수를 읽어 `fireRate += (총구수 − 1) × FIRE_RATE_PER_EXTRA_BARREL(=1)`. 총구 1개=+0, 2개=+1, …, 6개(미니건)=+5. clamp(1..10) 유지.
+- **왜 morph deltaAt 로 안 했나**: barrelCount 는 defaultT 0(1개)인데 piecewise 스탯델타 중립점은 t=0.5 → "t=0부터 단조 증가" 불가 → computeStats 직접 가산이 정답. morph.ts 주석만 갱신.
+- 기존 총(총구 1개)은 +0 이라 무영향. 다발 발사(총열 수만큼)는 유지 = 미니건이 더 강해짐(사용자 의도).
+- **검증**: 65테스트(신규 1)·typecheck 통과. 실브라우저 — 숏스냅 총구1개 연사 8 → 미니건(6개) 연사 10.

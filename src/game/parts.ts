@@ -8,7 +8,10 @@ import type {
   ProjectileKind,
   SlotType,
 } from './types.ts'
-import { morphStateDelta } from './morph.ts'
+import { morphStateDelta, barrelCountFromMorph } from './morph.ts'
+
+/** 총구 1개 늘어날 때마다 더해지는 연사 보너스 (사용자 요청: 총구 많을수록 빠르게). */
+const FIRE_RATE_PER_EXTRA_BARREL = 1
 
 // ─── 몸통 (기본 파워 소폭 상향 반영) ─────────────────────────
 export const BODIES: readonly BodyDef[] = [
@@ -390,6 +393,11 @@ export function computeStats(blaster: Blaster): BlasterStats {
     fireRate += md.fireRate ?? 0
     accuracy += md.accuracy ?? 0
     weight += md.weight ?? 0
+    // 총구가 많을수록 연사 빠르게 — 배럴의 총구 개수만큼 보너스(1개 초과분마다 +1)
+    if (slot === 'barrel') {
+      const barrels = barrelCountFromMorph(inst.morph)
+      fireRate += (barrels - 1) * FIRE_RATE_PER_EXTRA_BARREL
+    }
   }
 
   const weightLimit = body?.weightLimit ?? 8

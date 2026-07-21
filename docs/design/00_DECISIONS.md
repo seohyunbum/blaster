@@ -68,3 +68,6 @@
   - **02 다트 팩 로스터에 mag_revolver 추가**: 리볼버 실린더(축=Z 통통·짧은 실린더 + 앞면 다트 6발 링). capacity 6·reloadSec 1.5. computeStats/세이브/HUD 는 기존 magazine 배선 재사용.
   - **02 그립 로스터에 grip_revolver 추가**: 뒤로 젖힌 캡슐 + 둥근 뒤꿈치. 하단 그립 앵커(일반 그립 경로) 유지.
   - 명명: `revolver`/`리볼버` 는 08 §3.1 금칙어 아님(lint 통과). additive.
+
+- **2026-07-19 · 총구 많을수록 연사 빠르게** (사용자 명시 요청).
+  - **결정문 "barrelCount 스탯 무관(다발 발사가 보상)" 부분 대체**: 이제 총구 개수만큼 연사 보너스도 부여. computeStats 가 `fireRate += (총구수−1)×1` 직접 가산(barrelCount defaultT=0 이라 morph piecewise 로는 단조 증가 불가). 총구 1개=무변(기존 총 무영향), 미니건 6개=연사+5. 다발 발사는 유지 → 미니건 강화.

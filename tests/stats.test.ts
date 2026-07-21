@@ -123,3 +123,18 @@ test('다트 팩도 무게에 반영된다 (미니 클립 +0 < 젤리 탱크 +2)
   })
   assert.ok(heavy.weight > light.weight)
 })
+
+test('총구가 많을수록 연사가 빨라진다 (사용자 요청)', () => {
+  const one: Blaster = {
+    ...bare('body_titan'),
+    parts: { body: makeInstance('body_titan'), barrel: makeInstance('barrel_snap', { barrelCount: 0 }) }, // 총구 1개
+  }
+  const six: Blaster = {
+    ...bare('body_titan'),
+    parts: { body: makeInstance('body_titan'), barrel: makeInstance('barrel_snap', { barrelCount: 1 }) }, // 총구 6개(미니건)
+  }
+  const s1 = computeStats(one)
+  const s6 = computeStats(six)
+  assert.ok(s6.fireRate > s1.fireRate, `연사가 안 올라감: ${s1.fireRate} → ${s6.fireRate}`)
+  assert.equal(s6.fireRateRaw - s1.fireRateRaw, 5) // 총구 6개 = 1개 초과분 5 × +1
+})

@@ -207,7 +207,7 @@ export const MORPH_PARAMS: readonly MorphParamDef[] = [
     defaultT: 0, // 기본 1개
     discrete: true,
     deltaAt0: {},
-    deltaAt1: {}, // 스탯 무관 — 다발 발사가 보상
+    deltaAt1: {}, // 연사 보너스는 piecewise(중립 0.5) 로 못 낸다 → computeStats 가 총구 개수만큼 직접 가산
   },
   // ── 배럴 · 장식 (기본 없음) ──
   {
