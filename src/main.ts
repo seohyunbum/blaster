@@ -191,6 +191,30 @@ function rebuildEdit(lod?: 'drag' | 'full'): void {
   editRoot.add(editBuilt.group)
 }
 
+const _vmBox = new THREE.Box3()
+const _vmSize = new THREE.Vector3()
+const _vmCenter = new THREE.Vector3()
+/**
+ * 쏘기 화면 총(뷰모델)이 화면을 가리지 않게: 너무 큰 총(미니건 코어 등)은 자동 축소하고
+ * 중심을 뷰모델 원점으로 당겨 화면 아래쪽에 걸치게 한다. 보통 크기 총은 건드리지 않는다.
+ */
+function fitViewmodel(g: THREE.Object3D): void {
+  g.scale.setScalar(1)
+  g.position.set(0, 0, 0)
+  g.updateMatrixWorld(true)
+  _vmBox.setFromObject(g)
+  _vmBox.getSize(_vmSize)
+  _vmBox.getCenter(_vmCenter)
+  // 화면을 가리는 건 가로·세로(x·y)다. 깊이(z=길이)는 멀어지는 방향이라 화면을 안 가림 → 제외.
+  const screenDim = Math.max(_vmSize.x, _vmSize.y)
+  const TARGET = 0.34 // 화면에서 총이 차지할 최대 가로·세로 (보통 총 0.27~0.30 = 그대로, 미니건 0.6 = 축소)
+  if (screenDim <= TARGET) return // 보통 총은 기존 위치·크기 그대로
+  const s = TARGET / screenDim
+  g.scale.setScalar(s)
+  // 총 윗부분이 뷰모델 원점(화면 하단) 근처에 오도록 아래로 매달아 배치 → 큰 총이 시야를 안 가림
+  g.position.set(-_vmCenter.x * s, -(_vmCenter.y + _vmSize.y / 2) * s, -_vmCenter.z * s)
+}
+
 function rebuildViewmodel(): void {
   if (vmBuilt) {
     viewmodel.remove(vmBuilt.group)
@@ -198,6 +222,7 @@ function rebuildViewmodel(): void {
   }
   vmBuilt = buildBlaster(active, 'full')
   viewmodel.add(vmBuilt.group)
+  fitViewmodel(vmBuilt.group)
 }
 
 function refreshPanels(): void {
