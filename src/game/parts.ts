@@ -205,6 +205,15 @@ export const PARTS: readonly PartDef[] = [
     capacity: 6,
     reloadSec: 1.5,
   },
+  {
+    id: 'mag_rocket',
+    slot: 'magazine',
+    nameKo: '로켓 다트',
+    desc: '딱 1발! 대신 파워가 쭉쭉 오르는 커다란 로켓. 한 방 쏘고 재장전',
+    delta: { power: 6, weight: 3 },
+    capacity: 1,
+    reloadSec: 1.8,
+  },
   // 조준기 4종
   {
     id: 'sight_dot',

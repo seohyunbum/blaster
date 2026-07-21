@@ -680,7 +680,46 @@ function buildMagazine(partId: PartId, opts: BuildOpts): BuiltPart {
   const sz = morphLerp('magSize', resolveMorph(opts.morph, 'magSize'))
   const ln = morphLerp('magLength', resolveMorph(opts.morph, 'magLength'))
 
-  if (partId === 'mag_revolver') {
+  if (partId === 'mag_rocket') {
+    // 로켓 다트 — 몸통 아래 매달린 커다란 토이 로켓(축=Z, 앞으로 -Z). 둥근 몸체 + 주황 노즈 + 꼬리 지느러미.
+    const R = 0.03 * sz * 1.3
+    const len = 0.13 * ln
+    const cy = -R - 0.02 // 몸통 아래로 매달림
+    const cz = -0.03 * sz // 총구 쪽으로 살짝
+    // 로켓 몸체 (둥근 캡슐 느낌 실린더)
+    const bodyGeo = new THREE.CylinderGeometry(R, R * 0.9, len, seg)
+    bodyGeo.rotateX(Math.PI / 2) // 축 = Z
+    geos.push(bodyGeo)
+    const rocket = new THREE.Mesh(bodyGeo, fixedMaterial(PLACEHOLDER))
+    rocket.position.set(0, cy, cz)
+    primary.push(rocket)
+    group.add(rocket)
+    // 노즈 콘 (앞 -Z, 고정 주황 = 토이 시그니처)
+    const noseGeo = new THREE.ConeGeometry(R, R * 2.4, seg)
+    noseGeo.rotateX(-Math.PI / 2)
+    geos.push(noseGeo)
+    const nose = new THREE.Mesh(noseGeo, fixedMaterial(0xff8a2b))
+    nose.position.set(0, cy, cz - len / 2 - R * 1.2)
+    group.add(nose)
+    // 꼬리 지느러미 3개 (뒤쪽)
+    const finGeo = new THREE.BoxGeometry(0.008, R * 1.6, R * 1.4)
+    geos.push(finGeo)
+    for (let i = 0; i < 3; i++) {
+      const a = (i / 3) * Math.PI * 2
+      const fin = new THREE.Mesh(finGeo, fixedMaterial(PLACEHOLDER))
+      fin.position.set(Math.sin(a) * R, cy + Math.cos(a) * R, cz + len / 2 - R * 0.7)
+      fin.rotation.z = a
+      secondary.push(fin)
+      group.add(fin)
+    }
+    // 몸통에 잇는 짧은 목
+    const neckGeo = new THREE.BoxGeometry(0.02 * sz, 0.03, 0.03 * sz)
+    geos.push(neckGeo)
+    const neck = new THREE.Mesh(neckGeo, fixedMaterial(PLACEHOLDER))
+    neck.position.set(0, cy + R + 0.005, cz)
+    secondary.push(neck)
+    group.add(neck)
+  } else if (partId === 'mag_revolver') {
     // 리볼버 실린더 — 배럴 방향(축=Z)으로 누운 통통한 회전 실린더. 앞면에 다트 6발이 링으로 보인다(토이 시그니처).
     // 통통하고 짧은 실린더(지름>길이) = 리볼버 실루엣. 몸통 밑에 바싹 붙여 매단다.
     const R = 0.058 * sz

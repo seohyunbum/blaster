@@ -5,7 +5,6 @@ import type { Blaster, PartInstance, PartPaint, SlotType, ZoneId } from './types
 import { buildPart, type BuiltPart } from './partVisuals.ts'
 import { paintMaterial } from './materials.ts'
 import { bodyOf } from './parts.ts'
-import { barrelCountFromMorph } from './morph.ts'
 
 const ZONE_DEFAULT: Record<ZoneId, { color: string; finish: 'matte' | 'gloss' | 'metal' }> = {
   primary: { color: 'blasterBlue', finish: 'gloss' },
@@ -66,29 +65,16 @@ export function buildBlaster(
   parts.body = bodyBuilt
   group.add(bodyBuilt.group)
 
-  // 미니건 풀세트(미니건 코어 + 총구 6개 + 미니건 손잡이)면 손잡이를 몸통 아래(-Y)에 매단다 (사용자 요청)
-  const barrelInst = blaster.parts.barrel
-  const isMinigunSet =
-    bodyInst.partId === 'body_minigun' &&
-    blaster.parts.grip?.partId === 'grip_minigun' &&
-    !!barrelInst &&
-    barrelCountFromMorph(barrelInst.morph) === 6
-
   for (const slot of ATTACH_SLOTS) {
     const inst = blaster.parts[slot]
     if (!inst) continue
-    const isMinigunGrip = slot === 'grip' && inst.partId === 'grip_minigun'
-    // 미니건 손잡이: 풀세트면 몸통 아래(grip, -Y) 마운트, 아니면 몸통 위(gripTop). 그 외 파츠는 기본 소켓.
-    const anchor = isMinigunGrip
-      ? isMinigunSet
-        ? (bodyBuilt.anchors.grip ?? bodyBuilt.anchors.gripTop)
-        : (bodyBuilt.anchors.gripTop ?? bodyBuilt.anchors.grip)
-      : bodyBuilt.anchors[slot]
+    // 미니건 손잡이는 몸통 위(gripTop) 마운트로, 그 외 그립·파츠는 기본 소켓으로
+    const anchor =
+      slot === 'grip' && inst.partId === 'grip_minigun'
+        ? (bodyBuilt.anchors.gripTop ?? bodyBuilt.anchors.grip)
+        : bodyBuilt.anchors[slot]
     if (!anchor) continue
-    const built = attachTo(anchor, inst, lod)
-    // 아래 마운트일 땐 손잡이를 180° 뒤집어 아래로 매달리게 (원래 +Y로 자라는 톱 핸들)
-    if (isMinigunGrip && isMinigunSet) built.group.rotation.x += Math.PI
-    parts[slot] = built
+    parts[slot] = attachTo(anchor, inst, lod)
   }
 
   // 머즐 — 배럴 끝 앵커 우선, 없으면 몸통 앞 앵커
