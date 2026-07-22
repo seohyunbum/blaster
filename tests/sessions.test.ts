@@ -56,4 +56,17 @@ test('RangeSession은 탄약·재장전·별 계산을 캡슐화한다', () => {
   assert.equal(session.reloading, true)
   session.registerHit()
   assert.equal(session.stars, 1)
+
+  const halfReload = session.reloadDurMs / 2
+  assert.equal(session.update(0, halfReload, camera, range), undefined)
+  assert.ok(Math.abs((session.reloadProgress ?? 0) - 0.5) < 1e-9)
+  assert.equal(session.reloadCompleted, false)
+
+  session.update(0, session.reloadDurMs, camera, range)
+  assert.equal(session.reloadCompleted, true)
+  assert.equal(session.reloadProgress, null)
+  assert.equal(session.ammoCur, 1)
+
+  session.update(0, session.reloadDurMs + 1, camera, range)
+  assert.equal(session.reloadCompleted, false)
 })

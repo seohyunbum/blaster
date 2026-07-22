@@ -1,6 +1,6 @@
 import * as THREE from 'three'
 import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.js'
-import type { PartId } from '../types.ts'
+import type { MorphState, PartId } from '../types.ts'
 import { morphLerp, resolveMorph } from '../morph.ts'
 import { fixedMaterial } from '../materials.ts'
 import { PLACEHOLDER, segFor, type BuildOpts, type BuiltPart } from './types.ts'
@@ -34,6 +34,32 @@ const BODY_DIMS: Record<string, BodyDims> = {
   body_racer: { w: 0.18, h: 0.17, d: 0.43, shell: 'box', detail: 'wings' },
 }
 
+export interface BodyShellMetrics {
+  width: number
+  height: number
+  length: number
+  crossRadius: number
+  roundRatio: number
+  shell: BodyDims['shell']
+}
+
+/** 렌더러와 봉투 테스트가 함께 쓰는 몸통 실측 정본. */
+export function bodyShellMetrics(partId: PartId, morph: MorphState): BodyShellMetrics {
+  const dims = BODY_DIMS[partId] ?? BODY_DIMS.body_popcorn!
+  const width = dims.w * morphLerp('bodyChub', resolveMorph(morph, 'bodyChub'))
+  const height = dims.h * morphLerp('bodyChub', resolveMorph(morph, 'bodyChub'))
+  const length = dims.d * morphLerp('bodyLength', resolveMorph(morph, 'bodyLength'))
+  const roundFactor = morphLerp('bodyRound', resolveMorph(morph, 'bodyRound'))
+  return {
+    width,
+    height,
+    length,
+    crossRadius: Math.min(width, height) / 2,
+    roundRatio: dims.shell === 'box' ? Math.min(0.49, roundFactor) : 0.5,
+    shell: dims.shell,
+  }
+}
+
 /** 몸통 셸 지오메트리 — 실루엣 자체를 바꾼다(박스/캡슐/구). */
 function makeShell(
   shell: BodyDims['shell'],
@@ -60,13 +86,11 @@ function makeShell(
 
 export function buildBody(partId: PartId, opts: BuildOpts): BuiltPart {
   const dims = BODY_DIMS[partId] ?? BODY_DIMS.body_popcorn!
-  const lenScale = morphLerp('bodyLength', resolveMorph(opts.morph, 'bodyLength'))
-  const chub = morphLerp('bodyChub', resolveMorph(opts.morph, 'bodyChub'))
   const noseT = resolveMorph(opts.morph, 'bodyNose')
-
-  const w = dims.w * chub
-  const h = dims.h * chub
-  const d = dims.d * lenScale
+  const metrics = bodyShellMetrics(partId, opts.morph)
+  const w = metrics.width
+  const h = metrics.height
+  const d = metrics.length
   const halfZ = d / 2
 
   const group = new THREE.Group()
@@ -77,8 +101,7 @@ export function buildBody(partId: PartId, opts: BuildOpts): BuiltPart {
 
   const boxSeg = segFor(opts.lod, 4, 2)
   const minSide = Math.min(w, h)
-  const roundFactor = morphLerp('bodyRound', resolveMorph(opts.morph, 'bodyRound'))
-  const radius = Math.min(0.49 * minSide, roundFactor * minSide)
+  const radius = metrics.roundRatio * minSide
   const shellGeo = makeShell(dims.shell, w, h, d, radius, boxSeg)
   geos.push(shellGeo)
   const shell = new THREE.Mesh(shellGeo, fixedMaterial(PLACEHOLDER))

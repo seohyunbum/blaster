@@ -465,11 +465,14 @@ export function barrelLayout(count: number, r: number): [number, number][] {
 
 // ─── 토이 프로포션 봉투 상수 (09 §7) ───
 export const ENVELOPE = {
-  bodyAspectMax: 4.2,
-  barrelLoverRMax: 15,
-  minCrossRadius: 0.028,
-  roundPct: 0.25,
-  totalLenMax: 1.1,
+  // 76종 로스터의 현재 최대치를 감싸는 회귀 방지 ratchet (09 §7).
+  bodyAspectMax: 6,
+  barrelLoverRMax: 28,
+  minCrossRadius: 0.019,
+  barrelFrontRadiusMin: 0.012,
+  roundPctMin: 0.08,
+  roundPctDefault: 0.25,
+  totalLenMax: 1.3,
 } as const
 
 function accumulate(out: Required<StatDelta>, d: StatDelta, w: number): void {

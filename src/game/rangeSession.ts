@@ -23,11 +23,6 @@ export interface FireResult {
   startedReload: boolean
 }
 
-export interface RangeUpdateResult {
-  reloadCompleted: boolean
-  reloadProgress: number | null
-}
-
 export class RangeSession {
   private aimYawValue = 0
   private aimPitchValue = 0
@@ -39,6 +34,8 @@ export class RangeSession {
   private reloadingValue = false
   private reloadDurMsValue = 0
   private reloadEndT = 0
+  private reloadCompletedValue = false
+  private reloadProgressValue: number | null = null
   private guideSpeed = 30
   private guideGravity = 4
   private recoilRecovery = (8 * Math.PI) / 180
@@ -69,6 +66,8 @@ export class RangeSession {
     this.reloadingValue = false
     this.reloadDurMsValue = Math.max(0, stats.reloadSec) * 1000
     this.reloadEndT = 0
+    this.reloadCompletedValue = false
+    this.reloadProgressValue = null
     this.applyView(camera)
     this.composeAim(camera)
   }
@@ -84,6 +83,8 @@ export class RangeSession {
     this.ammoCurValue = this.ammoMaxValue
     this.reloadingValue = false
     this.reloadEndT = 0
+    this.reloadCompletedValue = false
+    this.reloadProgressValue = null
   }
 
   startReload(nowMs: number): boolean {
@@ -130,21 +131,21 @@ export class RangeSession {
     nowMs: number,
     camera: THREE.PerspectiveCamera,
     range: RangeController,
-  ): RangeUpdateResult {
+  ): void {
     if (this.recoilPitchValue > 0) {
       this.recoilPitchValue = Math.max(0, this.recoilPitchValue - dt * this.recoilRecovery)
       this.composeAim(camera)
     }
 
-    let reloadCompleted = false
-    let reloadProgress: number | null = null
+    this.reloadCompletedValue = false
+    this.reloadProgressValue = null
     if (this.reloadingValue) {
       if (nowMs >= this.reloadEndT) {
         this.reloadingValue = false
         this.ammoCurValue = this.ammoMaxValue
-        reloadCompleted = true
+        this.reloadCompletedValue = true
       } else {
-        reloadProgress = this.reloadDurMsValue > 0
+        this.reloadProgressValue = this.reloadDurMsValue > 0
           ? 1 - (this.reloadEndT - nowMs) / this.reloadDurMsValue
           : 1
       }
@@ -154,7 +155,6 @@ export class RangeSession {
     this.guideOrigin.copy(camera.position).addScaledVector(this.guideDir, 0.5)
     range.updateGuide(this.guideOrigin, this.guideDir, this.guideSpeed, this.guideGravity)
     range.update(dt, nowMs)
-    return { reloadCompleted, reloadProgress }
   }
 
   moveAim(deltaX: number, deltaY: number, camera: THREE.PerspectiveCamera): void {
@@ -226,6 +226,8 @@ export class RangeSession {
   get ammoCur(): number { return this.ammoCurValue }
   get reloading(): boolean { return this.reloadingValue }
   get reloadDurMs(): number { return this.reloadDurMsValue }
+  get reloadCompleted(): boolean { return this.reloadCompletedValue }
+  get reloadProgress(): number | null { return this.reloadProgressValue }
   get aimMode(): AimMode { return this.aimModeValue }
   get zoom(): number { return this.zoomValue }
   get recoilDeg(): number { return (this.recoilPitchValue * 180) / Math.PI }

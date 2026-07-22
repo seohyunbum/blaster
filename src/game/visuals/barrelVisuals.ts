@@ -1,7 +1,7 @@
 import * as THREE from 'three'
 import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.js'
-import type { PartId } from '../types.ts'
-import { morphLerp, resolveMorph, barrelCountFromMorph, barrelLayout } from '../morph.ts'
+import type { MorphState, PartId } from '../types.ts'
+import { ENVELOPE, morphLerp, resolveMorph, barrelCountFromMorph, barrelLayout } from '../morph.ts'
 import { fixedMaterial } from '../materials.ts'
 import { PLACEHOLDER, segFor, type BuildOpts, type BuiltPart } from './types.ts'
 
@@ -27,14 +27,32 @@ const BARREL_DIMS: Record<string, BarrelDims> = {
   barrel_racer: { r: 0.03, l: 0.34, style: 'fins' },
 }
 
+export interface BarrelTubeMetrics {
+  rearRadius: number
+  frontRadius: number
+  length: number
+}
+
+/** 렌더러와 봉투 테스트가 함께 쓰는 배럴 실측 정본. */
+export function barrelTubeMetrics(partId: PartId, morph: MorphState): BarrelTubeMetrics {
+  const dims = BARREL_DIMS[partId] ?? BARREL_DIMS.barrel_snap!
+  const rearRadius = dims.r * morphLerp('barrelBore', resolveMorph(morph, 'barrelBore'))
+  return {
+    rearRadius,
+    frontRadius: Math.max(
+      ENVELOPE.barrelFrontRadiusMin,
+      rearRadius * morphLerp('barrelTaper', resolveMorph(morph, 'barrelTaper')),
+    ),
+    length: dims.l * morphLerp('barrelLength', resolveMorph(morph, 'barrelLength')),
+  }
+}
+
 export function buildBarrel(partId: PartId, opts: BuildOpts): BuiltPart {
   const dims = BARREL_DIMS[partId] ?? BARREL_DIMS.barrel_snap!
-  const bore = morphLerp('barrelBore', resolveMorph(opts.morph, 'barrelBore'))
-  const lenScale = morphLerp('barrelLength', resolveMorph(opts.morph, 'barrelLength'))
-  const taperMul = morphLerp('barrelTaper', resolveMorph(opts.morph, 'barrelTaper'))
-  const r = dims.r * bore
-  const rFront = Math.max(0.012, r * taperMul) // 앞끝 반경 (뿔 모양)
-  const l = dims.l * lenScale
+  const metrics = barrelTubeMetrics(partId, opts.morph)
+  const r = metrics.rearRadius
+  const rFront = metrics.frontRadius
+  const l = metrics.length
 
   const group = new THREE.Group()
   const geos: THREE.BufferGeometry[] = []
