@@ -7,7 +7,9 @@
 ## 실행
 
 - **아들용**: 바탕화면 **"블래스터 공방"** 아이콘 더블클릭 (콘솔 창이 뜨고 브라우저가 자동으로 열림. 다 놀면 콘솔 창을 닫기)
-- 개발: `npm run dev` (포트 5175) · 검증: `npm run verify` (typecheck + 86개 테스트 + 아키텍처/핫패스 게이트)
+- 개발: `npm run dev` (포트 5175)
+- 빠른 검증: `npm run verify` (typecheck + 91개 테스트 + 아키텍처/핫패스 게이트)
+- 커밋 전 전체 검증: `npm run verify:full` (빠른 검증 + 프로덕션 빌드/번들 예산 + Playwright 시각·성능 smoke). Windows 로컬은 설치된 Edge, CI는 Playwright Chromium 사용
 
 ## 문서
 

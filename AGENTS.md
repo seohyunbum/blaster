@@ -47,8 +47,9 @@
 
 ## 3. 게이트
 
-- `npm run verify` = typecheck + 전체 단위 테스트 + 아키텍처 방향/크기 게이트 + 핫패스 할당 게이트. **커밋 전 필수.**
-- CI/Pages 배포도 `npm run verify` 통과 후에만 build 한다.
+- `npm run verify` = typecheck + 전체 단위 테스트 + 아키텍처 방향/크기 게이트 + 핫패스 할당 게이트. 빠른 로컬 검증용.
+- `npm run verify:full` = 위 정적 게이트 + 프로덕션 build/번들 예산 + 실제 브라우저 시각·성능 smoke. **커밋 전 필수.** Windows 로컬은 설치된 Edge, CI는 Playwright Chromium을 사용한다.
+- CI/Pages 배포도 `npm run verify:full` 통과 산출물만 배포한다.
 - 세이브 스키마 변경 시 `SAVE_VERSION` 증가 + 마이그레이션 + roundtrip 테스트.
 - **금칙어 lint**: 게임 문자열에 실총 명칭·금지 어휘(정본: docs/design/08_safety.md §3.1) 유입을 테스트로 차단.
 

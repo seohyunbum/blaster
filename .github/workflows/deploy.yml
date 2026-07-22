@@ -26,8 +26,8 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
-      - run: npm run verify
-      - run: npm run build # tsc --noEmit && vite build (base './' → 상대경로 = 서브패스 무관)
+      - run: npx playwright install --with-deps chromium
+      - run: npm run verify:full # 정적 게이트 + build + 실제 브라우저 시각·성능 smoke
       - uses: actions/upload-pages-artifact@v3
         with:
           path: dist

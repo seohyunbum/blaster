@@ -4,4 +4,6 @@ export const PERFORMANCE_BUDGETS = Object.freeze({
   maxPartMeshes: 14,
   maxBlasterMeshes: 56,
   maxSceneDrawCalls: 300,
+  maxVisibleMeshes: 800,
+  maxAverageFrameMs: 8,
 })
