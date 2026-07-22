@@ -19,14 +19,14 @@ export interface BlasterLabDebugHandle {
   readonly save: SavedGame
   readonly active: Blaster
   computeStats(): BlasterStats
-  rendererInfo(): { calls: number; triangles: number; geometries: number }
+  rendererInfo(): { calls: number; triangles: number; geometries: number; visibleMeshes: number }
   setStation(station: StationId): void
   setAim(yaw: number, pitch: number): void
   hits(): number
   selectMag(selection: AimSelection): void
   zoomState(): { aimMode: AimMode; zoom: number; fov: number }
   rotateState(): { mul: number; autoRotate: boolean; speed: number }
-  step(frames?: number): { calls: number; hits: number }
+  step(frames?: number): { calls: number; hits: number; averageFrameMs: number }
   ammoState(): { ammoMax: number; ammoCur: number; reloading: boolean; reloadDurMs: number }
   reload(): void
   state(): BlasterLabDebugState

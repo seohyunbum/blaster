@@ -688,6 +688,7 @@ const debugHandle: BlasterLabDebugHandle = {
     calls: renderer.info.render.calls,
     triangles: renderer.info.render.triangles,
     geometries: renderer.info.memory.geometries,
+    visibleMeshes: countVisibleMeshes(scene),
   }),
   setStation,
   setAim: (yaw: number, pitch: number) => {
@@ -703,7 +704,9 @@ const debugHandle: BlasterLabDebugHandle = {
   }),
   /** QA용 수동 스텝 — 백그라운드 탭 rAF 스로틀 우회. dt 고정 60fps. */
   step: (n = 1) => {
-    for (let i = 0; i < n; i++) {
+    const frames = Math.max(1, Math.floor(n))
+    const startedAt = performance.now()
+    for (let i = 0; i < frames; i++) {
       if (station === 'range') {
         const now = performance.now()
         rangeSession.update(1 / 60, now, camera, range)
@@ -711,7 +714,11 @@ const debugHandle: BlasterLabDebugHandle = {
       }
       renderer.render(scene, camera)
     }
-    return { calls: renderer.info.render.calls, hits: rangeSession.hits }
+    return {
+      calls: renderer.info.render.calls,
+      hits: rangeSession.hits,
+      averageFrameMs: (performance.now() - startedAt) / frames,
+    }
   },
   ammoState: () => ({
     ammoMax: rangeSession.ammoMax,
@@ -744,6 +751,12 @@ const debugHandle: BlasterLabDebugHandle = {
 window.__blasterLab = debugHandle
 
 // ─── 유틸 ──────────────────────────────────────────────────
+function countVisibleMeshes(root: THREE.Object3D): number {
+  let count = 0
+  root.traverseVisible((object) => { if (object instanceof THREE.Mesh) count += 1 })
+  return count
+}
+
 function worldToScreen(x: number, y: number, z: number): { x: number; y: number } | null {
   const v = new THREE.Vector3(x, y, z).project(camera)
   if (v.z > 1) return null

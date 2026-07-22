@@ -30,6 +30,7 @@ const BARREL_DIMS: Record<string, BarrelDims> = {
 export interface BarrelTubeMetrics {
   rearRadius: number
   frontRadius: number
+  maxRadius: number
   length: number
 }
 
@@ -37,12 +38,14 @@ export interface BarrelTubeMetrics {
 export function barrelTubeMetrics(partId: PartId, morph: MorphState): BarrelTubeMetrics {
   const dims = BARREL_DIMS[partId] ?? BARREL_DIMS.barrel_snap!
   const rearRadius = dims.r * morphLerp('barrelBore', resolveMorph(morph, 'barrelBore'))
+  const frontRadius = Math.max(
+    ENVELOPE.barrelFrontRadiusMin,
+    rearRadius * morphLerp('barrelTaper', resolveMorph(morph, 'barrelTaper')),
+  )
   return {
     rearRadius,
-    frontRadius: Math.max(
-      ENVELOPE.barrelFrontRadiusMin,
-      rearRadius * morphLerp('barrelTaper', resolveMorph(morph, 'barrelTaper')),
-    ),
+    frontRadius,
+    maxRadius: Math.max(rearRadius, frontRadius),
     length: dims.l * morphLerp('barrelLength', resolveMorph(morph, 'barrelLength')),
   }
 }

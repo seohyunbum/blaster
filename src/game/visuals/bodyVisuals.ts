@@ -41,6 +41,9 @@ export interface BodyShellMetrics {
   crossRadius: number
   roundRatio: number
   shell: BodyDims['shell']
+  boundsWidth: number
+  boundsHeight: number
+  boundsLength: number
 }
 
 /** 렌더러와 봉투 테스트가 함께 쓰는 몸통 실측 정본. */
@@ -50,13 +53,18 @@ export function bodyShellMetrics(partId: PartId, morph: MorphState): BodyShellMe
   const height = dims.h * morphLerp('bodyChub', resolveMorph(morph, 'bodyChub'))
   const length = dims.d * morphLerp('bodyLength', resolveMorph(morph, 'bodyLength'))
   const roundFactor = morphLerp('bodyRound', resolveMorph(morph, 'bodyRound'))
+  const crossRadius = Math.min(width, height) / 2
+  const capsuleDiameter = crossRadius * 2
   return {
     width,
     height,
     length,
-    crossRadius: Math.min(width, height) / 2,
+    crossRadius,
     roundRatio: dims.shell === 'box' ? Math.min(0.49, roundFactor) : 0.5,
     shell: dims.shell,
+    boundsWidth: dims.shell === 'capsule' ? capsuleDiameter : width,
+    boundsHeight: dims.shell === 'capsule' ? capsuleDiameter : height,
+    boundsLength: length,
   }
 }
 
