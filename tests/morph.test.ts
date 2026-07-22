@@ -97,7 +97,11 @@ test('boreScaleFromMorph: lerp(0.9,1.3)', () => {
 })
 
 test('토이 프로포션 봉투 상수 존재 (09 §7)', () => {
-  assert.equal(ENVELOPE.bodyAspectMax, 4.2)
-  assert.equal(ENVELOPE.barrelLoverRMax, 15)
-  assert.equal(ENVELOPE.totalLenMax, 1.1)
+  assert.equal(ENVELOPE.bodyAspectMax, 6)
+  assert.equal(ENVELOPE.barrelLoverRMax, 28)
+  assert.equal(ENVELOPE.minCrossRadius, 0.019)
+  assert.equal(ENVELOPE.barrelFrontRadiusMin, 0.012)
+  assert.equal(ENVELOPE.roundPctMin, 0.08)
+  assert.equal(ENVELOPE.roundPctDefault, 0.25)
+  assert.equal(ENVELOPE.totalLenMax, 1.3)
 })

@@ -16,6 +16,7 @@ const CONFETTI_MAX = 240
 const ASSIST_RADIUS_MUL = 1.7 // 데스크톱 어시스트 — 아이 친화로 상향 (04 §8 ①)
 const GUIDE_DOTS = 18 // 탄착 궤적 가이드 점
 const GROUND_Y = 0
+const CONFETTI_ACCENT_COLORS = [0xff8a2b, 0x2f7fe8, 0xf05454, 0x4cd964, 0xffd23f] as const
 
 export type HitKind = 'board' | 'balloon'
 export interface HitEvent {
@@ -74,6 +75,8 @@ export class RangeController {
   private confActive: boolean[] = []
   private confHead = 0
   private guide: THREE.InstancedMesh
+  /** update 핫패스에서 재사용한다. onHit 콜백은 값을 즉시 소비해야 한다. */
+  private readonly hitEvent: HitEvent = { kind: 'board', points: 0, x: 0, y: 0, z: 0 }
   private projectileVisuals: Record<
     ShotProfile['kind'],
     { geometry: THREE.BufferGeometry; material: THREE.Material }
@@ -291,7 +294,14 @@ export class RangeController {
   }
 
   fireOne(profile: ShotProfile, origin: THREE.Vector3, dir: THREE.Vector3): void {
-    const p = this.pool.find((x) => !x.active) ?? this.oldest()
+    let p: Pooled | undefined
+    for (const candidate of this.pool) {
+      if (!candidate.active) {
+        p = candidate
+        break
+      }
+    }
+    p ??= this.oldest()
     p.active = true
     p.mesh.visible = true
     const visual = this.projectileVisuals[profile.kind]
@@ -346,13 +356,12 @@ export class RangeController {
           b.root.visible = false
           b.respawnAt = nowMs + 3000
           this.spawnConfetti(b.center, p.kind)
-          this.onHit?.({
-            kind: 'balloon',
-            points: b.basePoints,
-            x: b.center.x,
-            y: b.center.y,
-            z: b.center.z,
-          })
+          this.hitEvent.kind = 'balloon'
+          this.hitEvent.points = b.basePoints
+          this.hitEvent.x = b.center.x
+          this.hitEvent.y = b.center.y
+          this.hitEvent.z = b.center.z
+          this.onHit?.(this.hitEvent)
           hit = true
           break
         }
@@ -366,7 +375,12 @@ export class RangeController {
           if (sweepHitSphere(_prev, _cur, _c, bd.hitRadius * ASSIST_RADIUS_MUL + p.radius)) {
             const dist = Math.hypot(p.pos.x - bd.center.x, p.pos.y - bd.center.y)
             const pts = dist < 0.15 ? 200 : dist < 0.35 ? 100 : 50
-            this.onHit?.({ kind: 'board', points: pts, x: p.pos.x, y: p.pos.y, z: bd.center.z })
+            this.hitEvent.kind = 'board'
+            this.hitEvent.points = pts
+            this.hitEvent.x = p.pos.x
+            this.hitEvent.y = p.pos.y
+            this.hitEvent.z = bd.center.z
+            this.onHit?.(this.hitEvent)
             hit = true
             break
           }
@@ -391,7 +405,6 @@ export class RangeController {
 
   private spawnConfetti(at: THREE.Vector3, kind: ProjectileKind): void {
     const projectile = PROJECTILE_DEFS[kind]
-    const palette = [projectile.color, 0xff8a2b, 0x2f7fe8, 0xf05454, 0x4cd964, 0xffd23f]
     const count = projectile.hitEffect === 'splash' ? 18 : 12
     for (let k = 0; k < count; k++) {
       const i = this.confHead
@@ -408,7 +421,9 @@ export class RangeController {
       _dummy.scale.setScalar(1)
       _dummy.updateMatrix()
       this.confetti.setMatrixAt(i, _dummy.matrix)
-      this.confetti.setColorAt(i, _col.setHex(palette[k % palette.length]!))
+      const colorIndex = k % (CONFETTI_ACCENT_COLORS.length + 1)
+      const color = colorIndex === 0 ? projectile.color : CONFETTI_ACCENT_COLORS[colorIndex - 1]!
+      this.confetti.setColorAt(i, _col.setHex(color))
     }
     this.confetti.instanceMatrix.needsUpdate = true
     if (this.confetti.instanceColor) this.confetti.instanceColor.needsUpdate = true

@@ -27,24 +27,30 @@
 
 ```
 check-architecture.mjs  # game/ui → main 역참조 금지 + main 850줄 상한
-check-hotpaths.mjs      # tick/update/animate 함수의 new THREE.* 할당 금지
+check-hotpaths.mjs      # tick/animate 및 game update*의 객체·배열·클로저·new 할당 금지(AST)
 ```
 
 브라우저 시각·실성능 smoke는 `window.__blasterLab` 디버그 핸들을 사용해 수동 QA하며, 자동화가 추가되기 전까지 존재하지 않는 스크립트를 `verify:full` 정본으로 주장하지 않는다.
 
 ```typescript
-// main.ts 부팅 시 1회 노출 — QA 하네스 전용 (전작 __wildernessGame 패턴 계승)
-declare global {
-  interface Window { __blasterLab?: BlasterLabDebugHandle }
-}
+// src/debug.ts가 소유하고 main.ts 부팅 시 1회 노출 — QA 하네스 전용
 export interface BlasterLabDebugHandle {
-  profile(): { visibleMeshes: number; drawCalls: number; frameMs: number };
-  // drawCalls = renderer.info.render.calls — 신작 스크립트가 실측하는 지표
-  getBlaster(): Blaster;
-  equipPart(slot: SlotType, partId: string): void;   // 테스트 자동화용
-  setMorph(slot: SlotType, key: string, t: number): void; // 09 봉투·앵커 테스트 자동화용
+  readonly save: SavedGame;
+  readonly active: Blaster;
+  computeStats(): BlasterStats;
+  rendererInfo(): { calls: number; triangles: number; geometries: number };
+  setStation(station: StationId): void;
+  setAim(yaw: number, pitch: number): void;
+  hits(): number;
+  selectMag(selection: AimSelection): void;
+  zoomState(): { aimMode: AimMode; zoom: number; fov: number };
+  rotateState(): { mul: number; autoRotate: boolean; speed: number };
+  step(frames?: number): { calls: number; hits: number };
+  ammoState(): { ammoMax: number; ammoCur: number; reloading: boolean; reloadDurMs: number };
+  reload(): void;
+  state(): BlasterLabDebugState;
+  setMorph(slot: SlotType, key: MorphKey, t: number): void;
   fire(): void;
-  setMode(mode: GameMode): void;
 }
 ```
 
@@ -72,7 +78,7 @@ export interface BlasterLabDebugHandle {
 
 ### 1.4 AGENTS.md 신규(본 게임 특화) 규약 — 처음부터 명문화
 
-1. **`PartDef.id` 는 영구 불변.** 개명은 `nameKo` 만 바꾼다. 파츠를 없앨 땐 id 를 `RETIRED_PART_FALLBACKS` 테이블(구 id → 대체 id)에 등록한다. morph 키도 같은 계열 — `MORPH_KEY_RENAMES`(09 §6 정본). 아이의 저장 작품이 개편 한 번에 깨지는 사고를 원천 차단한다.
+1. **`PartDef.id` 는 영구 불변.** 개명은 `nameKo` 만 바꾼다. 현재 실제 폐기·개명 사례는 0건이며, 최초 사례가 생기는 커밋에서 `RETIRED_PART_FALLBACKS` 또는 `MORPH_KEY_RENAMES`와 마이그레이션 테스트를 함께 추가한다. 현재의 미지 ID는 세이브에 보존하고 렌더러가 1메시 폴백으로 표시한다.
 2. **카메라 컨트롤 자작 금지.** 공방 궤도 카메라는 `three/addons/controls/OrbitControls.js` + `minDistance`/`maxDistance`/`maxPolarAngle` 제한 설정으로 끝낸다(결정문 24). 단 **탭/드래그 판별(8px)은 pointer 이벤트 레이어에서 병행 구현**해 OrbitControls 와 발사·UI 탭이 간섭하지 않게 한다.
 3. **체감 없는 스탯 금지.** 모든 스탯 축은 §3 매핑표에 "눈 또는 손으로 느껴지는 효과" 1개 이상이 배선되어야 추가할 수 있다. capacity·reload 가 M2(재장전 도입)까지 노출되지 않는 이유다(결정문 21).
 4. **끼운 뒤 거부하는 UX 금지.** 유효성 검사는 사전 차단(UI 에서 애초에 선택 불가)이어야 한다. 몸통별 소켓 차등(결정문 17)은 "빈 소켓 = 없는 소켓" 표현(03)으로 UI 가 사전에 흡수하므로 사후 거부 경로가 없다.
@@ -185,10 +191,7 @@ export function createEditHistory<T>(limit = 30): EditHistory<T>;
 
 - **저장 = 06 자동저장 4트리거가 정본** (결정문 14) — **명시 저장 버튼 없음** (초안의 "차고에 저장" 버튼 삭제). 09 의 슬라이더 pointerup·프리셋 버튼은 "변형 직후" 트리거로 flush 한다. 전작에서 겪은 **동시저장 경쟁·중복 슬롯 사고**(디바운스+`saveInProgress` 가드로 해소)를 알고 있으므로 처음부터 가드 포함.
 - **세이브 루트 정본 = 05 SavedGame + 프로필 키 구조** (결정문 13) — 본 섹션의 스키마 표기는 스케치다. **morph 포함 SAVE_VERSION 1 부터**. localStorage 키 접두사 = `blaster_lab_` (결정문 1).
-- **세이브 무결성 — ID 폴백 3중 방어 (M1 필수)**: `Blaster.parts` 는 문자열 ID 참조라 마이그레이션으로는 ID 소멸이 안 잡힌다. 아이가 아끼는 저장 블래스터가 소리 없이 깨지는 것은 최악의 사고이므로:
-  1. `PartDef.id` 영구 불변(§1.4-1) + 삭제 시 `RETIRED_PART_FALLBACKS` 등록. morph 키는 `MORPH_KEY_RENAMES`(09 §6 — 미지 키 무시·NaN clamp 등 로드 규칙 정본).
-  2. `saveManager` 로드 시 미지 partId → 폴백 테이블 → 그래도 없으면 슬롯별 기본 파츠 대체 + 콘솔 경고. **원본 세이브를 덮어쓰지 않는다** — 자동저장 트리거가 실제로 발화할 때만 갱신.
-  3. `save-roundtrip-test.mjs` 에 "미지 partId 세이브 로드" + "미지 MorphKey 세이브 로드" 케이스 포함.
+- **세이브 무결성 — 미지 ID 보존 우선**: `Blaster.parts`의 미지 `partId`는 로드 시 그대로 보존하고, 시각 레지스트리가 1메시 폴백으로 표시한다. 미지 morph 키는 정규화 과정에서 제거한다. `save-durability.test.ts`가 두 경로와 원본 비변경을 고정한다. 실제 ID 폐기·키 개명이 처음 생기면 같은 커밋에서 명시적 매핑과 마이그레이션 테스트를 추가한다.
 - **저장 실패 대비** (결정문 26): `SaveRepository`가 주입받은 storage에 메인본과 최근 5개 롤링 백업을 기록한다. `SaveCodec`은 정규화·마이그레이션을, `saveModel`은 팩토리를 담당한다. persist는 전달 객체를 mutate하지 않는다.
 - **부팅 가드 (M1, 결정문 26)**: ① WebAudio 첫 탭 resume 태스크, ② WebGL 컨텍스트 로스트 시 리로드 안내, ③ 설정 최소 토글 2종(사운드/에임 어시스트) — main.ts 부팅 배선. **M2 예약**: 일시정지, 이벤트 버스 계약(발행 정의 = 04).
 
@@ -196,13 +199,13 @@ export function createEditHistory<T>(limit = 30): EditHistory<T>;
 
 | 대상 | 러너 | 시점 | 내용 |
 | --- | --- | --- | --- |
-| 스탯 합성 | `scripts/assembly-test.mjs` | **M1 전** (의존되기 전에 테스트부터 — 전작 §8) | 파츠 조합→스탯 스냅샷 12케이스 + 슬롯 규칙(body 만 필수) + 1~10 클램프 + 맨몸 기본 발사값 |
-| morph | `morph-test.mjs` | **M1** | statDelta t=0/0.5/1 스냅샷 + 봉투 교차표 전수(전 partId × 범위 꼭짓점) + 속성 50콤보 + `countMeshes ≤ 14` + 앵커 전진량 — 케이스 정본 09 §7 |
-| 직렬화 roundtrip | `save-roundtrip-test.mjs` | M1 | save→load→deepEqual + **미지 partId·미지 MorphKey 폴백 케이스** (전작 러너 골격 복사) |
-| 마이그레이션 | `save-migration-test.mjs` | **버전 2가 생기는 순간**(M3) | v1 세이브 → 최신 로드. 전작 규율: SavedGame 형태 변경 = 버전↑ + 마이그레이션 + 테스트 같은 커밋 |
-| 탄도 | `ballistics-test.mjs` | **M1** (결정문 19) | 고정 시드에서 포물선 낙차·연사 간격 + ShotProfile 클램프(20~60m/s·0.3~4.0°·150~600ms) 준수 검증 |
-| 시각 | `visual-check.mjs` **신작** | M1 | 공방 씬 로드 + 캔버스 비검정 픽셀 + 콘솔 에러 0 |
-| 성능 | `performance-smoke.mjs` **신작** | M2 | `window.__blasterLab.profile()` 실측 → §1.2 단일표 대조 |
+| 스탯 합성 | `tests/stats.test.ts` | **M1 전** | 파츠 조합·슬롯 규칙(body 만 필수)·1~10 클램프·맨몸 기본 발사값 |
+| morph | `tests/morph.test.ts`·`tests/envelope.test.ts` | **M1** | statDelta t=0/0.5/1 + 전 partId × 범위 꼭짓점 + 결정적 랜덤 50콤보 + 전 몸통×배럴 최대 전장 — 케이스 정본 09 §7 |
+| 직렬화·내구성 | `tests/save*.test.ts` | M1 | save→load→deepEqual + 미지 partId 보존/렌더 폴백 + 미지 MorphKey 제거 + 입력 객체 비변경 |
+| 마이그레이션 | 최초 `SAVE_VERSION=2` 커밋에서 추가 | **버전 2가 생기는 순간**(M3) | v1 세이브 → 최신 로드. SavedGame 형태 변경 = 버전↑ + 마이그레이션 + 테스트 같은 커밋 |
+| 탄도 | `tests/ballistics.test.ts` | **M1** (결정문 19) | 포물선 낙차·스윕 충돌 + ShotProfile 클램프(20~60m/s·0.3~4.0°·150~600ms) 준수 검증 |
+| 시각 | 현재 수동 브라우저 QA, M5 자동화 예정 | M1~M5 | 공방 씬·캔버스·콘솔 오류 확인. 존재하지 않는 자동 스크립트는 verify 정본으로 간주하지 않음 |
+| 성능 | `window.__blasterLab` 수동 실측, M5 자동화 예정 | M2~M5 | `rendererInfo`·`step`·`state`로 §1.2 단일표 대조 |
 
 러너는 전작 방식 그대로 **node 스크립트, tsx·esbuild 없이**: 순수 `game/*.ts` 를 직접 검증하기 위해 전작 `combat-test.mjs` 가 쓰는 로딩 방식을 복사한다.
 

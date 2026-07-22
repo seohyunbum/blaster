@@ -33,6 +33,7 @@ import { createRangeHud } from './ui/rangeHud.ts'
 import type { AimSel } from './ui/rangeHud.ts'
 import { createRotateControl } from './ui/rotateControl.ts'
 import { createCollectionPanel } from './ui/collectionPanel.ts'
+import type { BlasterLabDebugHandle } from './debug.ts'
 
 // ─── DOM ────────────────────────────────────────────────────
 const app = document.getElementById('app')!
@@ -627,12 +628,12 @@ function tick(): void {
   const dt = Math.min(0.05, (now - lastT) / 1000)
   lastT = now
   if (station === 'range') {
-    const result = rangeSession.update(dt, now, camera, range)
-    if (result.reloadCompleted) {
+    rangeSession.update(dt, now, camera, range)
+    if (rangeSession.reloadCompleted) {
       syncAmmo()
       sfx.reloadDone()
-    } else if (result.reloadProgress !== null) {
-      syncAmmo(result.reloadProgress)
+    } else if (rangeSession.reloadProgress !== null) {
+      syncAmmo(rangeSession.reloadProgress)
     }
   } else {
     // 드래그 중 쌓인 morph 변경을 프레임당 1회만 재빌드 (코얼레싱)
@@ -675,7 +676,7 @@ resize()
 tick()
 
 // 디버그 핸들 (QA 하네스용)
-;(window as unknown as { __blasterLab: unknown }).__blasterLab = {
+const debugHandle: BlasterLabDebugHandle = {
   get save() {
     return save
   },
@@ -705,8 +706,8 @@ tick()
     for (let i = 0; i < n; i++) {
       if (station === 'range') {
         const now = performance.now()
-        const result = rangeSession.update(1 / 60, now, camera, range)
-        if (result.reloadCompleted) syncAmmo()
+        rangeSession.update(1 / 60, now, camera, range)
+        if (rangeSession.reloadCompleted) syncAmmo()
       }
       renderer.render(scene, camera)
     }
@@ -740,6 +741,7 @@ tick()
   },
   fire,
 }
+window.__blasterLab = debugHandle
 
 // ─── 유틸 ──────────────────────────────────────────────────
 function worldToScreen(x: number, y: number, z: number): { x: number; y: number } | null {
