@@ -15,7 +15,7 @@ function tsFiles(dir) {
   return out
 }
 
-for (const layer of ['game', 'ui']) {
+for (const layer of ['game', 'ui', 'modes']) {
   for (const path of tsFiles(join(srcRoot, layer))) {
     const source = readFileSync(path, 'utf8')
     if (/from\s+['"][^'"]*main(?:\.ts)?['"]/.test(source)) {

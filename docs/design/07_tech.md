@@ -4,7 +4,7 @@
 >
 > 본 개정판의 최우선 원칙: **M1 첫 플레이어블에서 이미 "바꾸면 달라지고, 맞으면 반응한다"가 성립**해야 한다. 여기에 결정문 27 이 한 축을 추가한다 — **자유 변형(파라메트릭 조형)이 M1 핵심 기둥**이다. 상세 사양(파라미터·봉투·UX)의 정본은 09 이며, 본 섹션은 그것이 올라탈 **모듈 구조·게이트·verify 편입·마일스톤 반영**만 소유한다.
 
-> **현재 구현 기준(2026-07-22)**: `src/game/definitions.ts`가 슬롯·스테이션·발사체 레지스트리, `budgets.ts`가 성능 수치 정본이다. 상태는 `EditorSession`·`RangeSession`, 시각은 `visuals/*Visuals.ts`, 저장은 Model·Codec·Repository로 분리되어 있다. `main.ts`는 786줄이며 게이트 상한은 850줄이다. 아래의 초기 M0/M1 계획 서술과 충돌하면 이 현재 구현 기준을 우선한다.
+> **현재 구현 기준(2026-07-24)**: `src/game/definitions.ts`가 슬롯·스테이션·발사체 레지스트리, `budgets.ts`가 성능 수치 정본이다. 상태는 `EditorSession`·`RangeSession`·`PvpSession`, PVP 조율은 지연 로딩되는 `PvpMode`, 시각은 `visuals/*Visuals.ts`, 저장은 Model·Codec·Repository로 분리되어 있다. `main.ts`는 823줄(게이트 계산 기준)이며 게이트 상한은 850줄이다. 아래의 초기 M0/M1 계획 서술과 충돌하면 이 현재 구현 기준을 우선한다.
 
 ## 1. 전작 아키텍처 규칙 계승 선언
 
@@ -26,13 +26,13 @@
 빠른 `verify`의 구조 게이트 2개와 `verify:full`의 빌드·브라우저 게이트 2개가 존재한다.
 
 ```
-check-architecture.mjs  # game/ui → main 역참조 금지 + main 850줄 상한
-check-hotpaths.mjs      # tick/animate 및 game update*의 객체·배열·클로저·new 할당 금지(AST)
+check-architecture.mjs  # game/ui/modes → main 역참조 금지 + main 850줄 상한
+check-hotpaths.mjs      # tick/animate 및 game/modes update*의 객체·배열·클로저·new 할당 금지(AST)
 check-bundle-size.mjs   # 앱 120KB·Three 580KB·전체 JS 700KB raw 상한
 browser-smoke.mjs       # 실제 빌드 화면·콘솔·finish·draw call·지오메트리 누수
 ```
 
-브라우저 smoke는 `window.__blasterLab` 디버그 핸들을 통해 공방·사격장 전환, 화면 비검정/색상 다양성, matte/metal 픽셀 차, draw call 300 이하, 반복 재빌드 geometry 비증가, 콘솔 오류 0을 자동 검증한다.
+브라우저 smoke는 `window.__blasterLab` 디버그 핸들을 통해 공방·사격장·PVP 전환, PVP 보관함 수·라운드 1/3·체력 10/10, 화면 비검정/색상 다양성, matte/metal 픽셀 차, draw call 300 이하, 반복 재빌드 geometry 비증가, 콘솔 오류 0을 자동 검증한다.
 
 ```typescript
 // src/debug.ts가 소유하고 main.ts 부팅 시 1회 노출 — QA 하네스 전용
@@ -76,7 +76,7 @@ export interface BlasterLabDebugHandle {
 "verify:full": "npm run verify && npm run build && npm run test:browser"
 ```
 
-- `node --test tests/*.test.ts`가 스탯·morph·탄도·저장 roundtrip·내구성·레지스트리 완전성·세션·비주얼·금칙어 91개를 실행한다.
+- `node --test tests/*.test.ts`가 스탯·morph·탄도·저장 roundtrip·내구성·레지스트리 완전성·세션·PVP 규칙·비주얼·금칙어 100개를 실행한다.
 - `npm run build`는 Three vendor 분리 후 앱/Three/전체 JS의 raw 크기 ratchet을 강제한다.
 - Pages CI는 `npm ci → Playwright Chromium 설치 → npm run verify:full` 순서이며 검증 실패 산출물을 배포하지 않는다.
 
@@ -100,6 +100,10 @@ src/
 │   ├── parts.ts               # 76종 카탈로그 + computeStats
 │   ├── editorSession.ts       # 편집·undo·랜덤·색칠 상태
 │   ├── rangeSession.ts        # 조준·탄약·재장전·별 상태
+│   ├── pvpSession.ts          # 체력·라운드·연사·동시 판정 순수 규칙
+│   ├── pvpArena.ts            # AI 드론 무대·양방향 투사체 풀
+│   ├── pvpLoadouts.ts         # 3라운드 AI 로드아웃 데이터
+│   ├── viewmodel.ts           # 사격장·PVP 공용 뷰모델 맞춤
 │   ├── assembly.ts            # 파츠 앵커 조립·paint 적용
 │   ├── partVisuals.ts         # typed visual registry 파사드
 │   ├── visuals/*Visuals.ts    # 슬롯별 메시 레시피
@@ -107,14 +111,15 @@ src/
 │   ├── saveCodec.ts           # 정규화·마이그레이션·import/export
 │   ├── saveRepository.ts      # storage·clock 주입형 저장소
 │   └── save.ts                # 하위 호환 facade
-└── ui/                        # DOM 표현. main import 및 Three 조립 직접 호출 금지
+├── modes/pvpMode.ts           # PVP 수명주기·입력·카메라 조율
+└── ui/                        # pvpHud 포함. DOM 표현. main import 및 Three 조립 직접 호출 금지
 ```
 
 확장 규칙:
 
 - 새 슬롯·스테이션·발사체 종류는 먼저 `definitions.ts`에 등록한다. UI 목록·조립·랜덤·물리 정책은 여기서 파생한다.
 - 기존 슬롯 파츠는 `parts.ts` 데이터, 해당 `visuals/*Visuals.ts` 레시피, `visualRecipeIds.ts` 등록을 함께 추가한다. 카탈로그와 시각 집합이 다르면 테스트가 실패한다.
-- 상태·생명주기는 `EditorSession`·`RangeSession`·`SaveRepository`가 소유한다. `main.ts`에는 새 도메인 상태를 추가하지 않는다.
+- 상태·생명주기는 `EditorSession`·`RangeSession`·`PvpSession`·`SaveRepository`가 소유하고, 모드 수명주기는 `PvpMode`가 조율한다. `main.ts`에는 새 도메인 상태를 추가하지 않는다.
 - 파츠별 하위 클래스는 만들지 않는다. 데이터 + capability + 슬롯별 Strategy 빌더 조합을 유지한다.
 
 핵심 타입 스케치 (`game/types.ts`) — **정본은 02(슬롯·로스터 구조)·09(morph)·05(세이브 컨테이너), 아래는 배선용 스케치다** (결정문 12):
@@ -151,25 +156,26 @@ export interface Blaster {        // 단일 타입 확정 (결정문 12)
 | `power` | 탄속(04 클램프 20~60m/s) + 발사체 **크기** + 타겟 반응 과장(넉백·풍선 pop) | **M1** (탄속·크기) → M2 (타겟 반응 스케일) |
 | `fireRate` | 발사 간격 150~600ms (누르고 있으면 연사) | **M1** |
 | `accuracy` | 퍼짐 0.3~4.0° — 조준원 시각화 + 탄착이 원 안에 분산 | **M1** (드래그 조준이 M1 이므로 — 결정문 18; 조준원 연출 보강은 M2) |
-| `handling` | 조준 관성 — 무거울수록 십자선이 드래그를 굼뜨게 따라옴 | M2 |
+| `handling` | 조준 관성·좌우 이동 — PVP에서는 조준 추종 6~18/s, 이동 1.8~3.6으로 현재 배선 | **PVP 완료**, 사격장 M2 |
 | `capacity` / `reload` | "다트 수"(결정문 25) · 재장전 시간 | **M2** — 재장전 도입과 동시 노출 (결정문 21 "체감 없는 스탯 금지") |
 
 - morph 스탯 델타는 파츠 교체 델타보다 한 급 작다 — 결합식·체감 채널(연속 별 채움·퍼짐 원 프리뷰·사격장 바로가기)의 정본은 09 §4. 본 섹션은 `computeStats` 단일 경로(프리뷰와 실발사가 같은 함수를 봄 → 거짓 프리뷰 구조적 불가)만 강제한다.
 - 초안의 `weight` 삭제·`handling` 대체, 호환성 제한(`compatible`) 제거 결론은 유지하되(§1.4-4), 최종 스탯 명세는 02 를 따른다.
 
-## 4. 씬/상태 전환 — 스테이션 4종 (06 정본)
+## 4. 씬/상태 전환 — 스테이션 5종 (06 정본)
 
 **단일 씬 + 그룹 토글**. 전작이 오버월드/동굴/요새를 단일 씬 오브젝트 스왑으로 처리해 검증된 방식이고, 본 게임은 전환 시 **블래스터 메시를 그대로 들고 가야** 하므로 씬을 나누면 오히려 메시 이전 비용이 생긴다.
 
 ```typescript
 // definitions.ts STATION_DEFS의 key에서 파생 — 새 스테이션은 mode·panel 정책 필수
-type StationId = "workshop" | "paint" | "range" | "collection";
+type StationId = "workshop" | "paint" | "range" | "pvp" | "collection";
 ```
 
 ```
 scene
 ├── workshopGroup   // 회전 받침대·작업대·배경 — 조립+자유 변형(09)의 무대
 ├── rangeGroup      // "사격장" 풍선 마당: 고정 과녁 3 + 풍선 6 — M1 (결정문 20)
+├── pvpArenaGroup   // 첫 PVP 진입 시 동적 import·생성, 이후 재사용
 ├── editRoot        // 공방·꾸미기·보관함이 공유하는 회전식 블래스터 무대
 ├── blasterAnchor   // 조립된 블래스터 메시 — 전 스테이션 공용, 부모만 유지
 └── lights          // 공용 (스테이션별 강도만 트윈)
@@ -179,7 +185,7 @@ scene
 - **M1 사격 = 1인칭 사대 고정 + 드래그 조준 + 탭/클릭 발사** (결정문 18). Pointer Lock 미사용 — 드래그 조준. 누르고 있으면 `fireRate` 간격 연사. 탭/드래그 판별(8px)은 §1.4-2 pointer 레이어와 공유.
 - **탄도 = 포물선(오일러) 이 M1 정본** (결정문 19, 04 소관). `ballistics.ts` 는 04 ShotProfile 을 소비하는 순수 계산 리프.
 - 카메라: 공방 = OrbitControls(§1.4-2), 사격장 = 1인칭 고정(전작 1인칭 카메라 코드 재사용).
-- 두 그룹 모두 **부팅 시 1회 생성** 후 유지 — 전환 시 지오메트리/머티리얼 생성 없음(전작 §10 규칙). 타겟 리셋은 위치·상태 초기화만. 예외는 morph 재빌드뿐이며 pointer 경로 한정(09 §3.2).
+- 편집·사격 그룹은 **부팅 시 1회 생성** 후 유지하고, PVP 그룹은 첫 진입 시 단일-flight 동적 import로 1회 생성 후 유지 — 전환 시 지오메트리/머티리얼 생성 없음(전작 §10 규칙). 타겟 리셋은 위치·상태 초기화만. 예외는 morph 재빌드뿐이며 pointer 경로 한정(09 §3.2).
 - 발사체는 **풀 64 상한** (§1.2 단일표).
 - 스테이션 전환은 `STATION_DEFS[id].mode/panel`을 소비한다. 미등록 나머지를 사격장으로 보내는 fallthrough 분기는 금지한다.
 
@@ -208,8 +214,8 @@ export function createEditHistory<T>(limit = 30): EditHistory<T>;
 | 직렬화·내구성 | `tests/save*.test.ts` | M1 | save→load→deepEqual + 미지 partId 보존/렌더 폴백 + 미지 MorphKey 제거 + 입력 객체 비변경 |
 | 마이그레이션 | 최초 `SAVE_VERSION=2` 커밋에서 추가 | **버전 2가 생기는 순간**(M3) | v1 세이브 → 최신 로드. SavedGame 형태 변경 = 버전↑ + 마이그레이션 + 테스트 같은 커밋 |
 | 탄도 | `tests/ballistics.test.ts` | **M1** (결정문 19) | 포물선 낙차·스윕 충돌 + ShotProfile 클램프(20~60m/s·0.3~4.0°·150~600ms) 준수 검증 |
-| 시각 | `scripts/browser-smoke.mjs` | 자동화 완료 | 실제 프로덕션 빌드의 비검정/색상 다양성·matte/metal 픽셀 차·콘솔 오류 0 |
-| 성능 | `scripts/browser-smoke.mjs`·`check-bundle-size.mjs` | 자동화 완료 | 공방/사격장 draw call·재빌드 geometry 누수·앱/Three/전체 JS 크기 ratchet |
+| 시각 | `scripts/browser-smoke.mjs` | 자동화 완료 | 실제 프로덕션 빌드의 비검정/색상 다양성·matte/metal 픽셀 차·PVP 로비→전투·콘솔 오류 0 |
+| 성능 | `scripts/browser-smoke.mjs`·`check-bundle-size.mjs` | 자동화 완료 | 공방/사격장/PVP draw call·재빌드 geometry 누수·앱/PVP 지연 청크/Three/전체 JS 크기 ratchet |
 
 러너는 전작 방식 그대로 **node 스크립트, tsx·esbuild 없이**: 순수 `game/*.ts` 를 직접 검증하기 위해 전작 `combat-test.mjs` 가 쓰는 로딩 방식을 복사한다.
 

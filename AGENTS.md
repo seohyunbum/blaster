@@ -6,7 +6,7 @@
 
 ## 0. 이 프로젝트는
 
-- 초등 자녀와 함께 만드는 **3D 블래스터 공방 게임** — 파츠 조합 + 자유 변형(파라메트릭 조형) + 색칠 + 사격 시뮬레이션.
+- 초등 자녀와 함께 만드는 **3D 블래스터 공방 게임** — 파츠 조합 + 자유 변형(파라메트릭 조형) + 색칠 + 사격 시뮬레이션 + AI 드론 PVP 팝 아레나.
 - Three.js + Vite + TypeScript strict. 로컬 브라우저 실행(`launch-game.bat` / `npm run dev`).
 - 한 번에 작은 변경 · 30분 안에 움직이는 결과 · 재미있어진 순간마다 커밋.
 
@@ -16,6 +16,7 @@
 
 - 게임 로직·데이터 → `src/game/` (main.ts import 금지 — leaf)
 - 화면 표현(HTML/DOM) → `src/ui/` (main.ts import 금지 — leaf)
+- 모드 수명주기·입력 조율 → `src/modes/` (game/ui를 조합하되 main.ts import 금지)
 - 메시 생성 → `src/game/*Visuals.ts` (데이터 → THREE.Object3D 순수 팩토리, 부수효과 금지)
 - `main.ts` 는 **지휘자(conductor)**: 루프·입력·공유 상태·배선만. 늘어나면 안 된다.
 
@@ -32,6 +33,11 @@
 | `src/game/assembly.ts` | Blaster → 조립 메시 + 앵커 부착·색칠 |
 | `src/game/editorSession.ts` | 편집 상태·undo·랜덤·색칠 캡슐화 |
 | `src/game/rangeSession.ts` | 조준·탄약·재장전·점수 세션 캡슐화 |
+| `src/game/pvpSession.ts` | PVP 체력·라운드·연사 게이트·동시 판정 순수 규칙 |
+| `src/game/pvpArena.ts` | 구형 AI 드론 무대·양방향 투사체 풀·충돌 |
+| `src/game/pvpLoadouts.ts` | AI 드론 3라운드 데이터 로드아웃 |
+| `src/game/viewmodel.ts` | 사격장·PVP 공유 블래스터 뷰모델 맞춤 |
+| `src/modes/pvpMode.ts` | PVP 로비·입력·카메라·세션 수명주기 조율 |
 | `src/game/partVisuals.ts` | typed visual registry 파사드 |
 | `src/game/visuals/*Visuals.ts` | 슬롯별 파라메트릭 메시 빌더 |
 | `src/game/palette.ts` | PaletteKey 색 정본 (자유 RGB 금지 — 가드레일) |
@@ -41,9 +47,10 @@
 | `src/game/saveCodec.ts` | JSON 정규화·마이그레이션·import/export |
 | `src/game/saveRepository.ts` | storage·clock 주입형 저장소 |
 | `src/game/save.ts` | 위 저장 모듈의 하위 호환 facade |
+| `src/ui/pvpHud.ts` | 보관함 로드아웃·체력·라운드·결과 HUD |
 | `src/ui/*.ts` | 패널·HUD 렌더 (뷰모델 + DOM) |
 
-**의존 방향:** `main.ts → (game/, ui/)` 단방향. leaf 가 main.ts 를 import 하면 실패다.
+**의존 방향:** `main.ts → modes/ → (game/, ui/)` 및 `main.ts → (game/, ui/)` 단방향. `game/`·`ui/`·`modes/`가 main.ts 를 import 하면 실패다.
 
 ## 3. 게이트
 
@@ -57,11 +64,11 @@
 
 - `update*`/`animate*`/`tick*` 안에서 `new THREE.*`·새 객체/배열/클로저 할당 금지 — 스크래치 필드 재사용.
 - 머티리얼은 색|finish 캐시 공유(`material.color.set()` 직접 변경 금지). 지오메트리 재생성은 morph 드래그 중 스로틀 + 이전 지오메트리 dispose.
-- 모든 spawn(투사체·파티클)은 풀링 + 상한. 수치 정본은 `src/game/budgets.ts`(투사체 풀 64·파츠 14·완전 장착 56·씬 300).
+- 모든 spawn(투사체·파티클)은 풀링 + 상한. 수치 정본은 `src/game/budgets.ts`(모드별 투사체 풀 64·파츠 14·완전 장착 56·씬 300). 사격장과 PVP는 상호 배타적으로 활성화한다.
 
 ## 5. 연령 가드레일 (하드 룰)
 
-- 토이 블래스터 스타일. 실총 브랜드·모델명 금지, 사람·동물형 타겟 금지, 유혈 금지.
+- 토이 블래스터 스타일. 실총 브랜드·모델명 금지, 사람·동물형 타겟·상대 금지, 유혈 금지. PVP 상대는 눈·표정·신체 부위가 없는 구형 AI 드론만 허용한다.
 - 어휘·색·이펙트 기준 정본 = `docs/design/08_safety.md`. 코드 식별자도 금칙어 적용(예: sniper → precision).
 
 ## 6. 커밋 규율

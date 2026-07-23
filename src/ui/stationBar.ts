@@ -1,5 +1,5 @@
-// src/ui/stationBar.ts — 상단 스테이션 탭(공방/꾸미기/사격장) + 되돌리기 (leaf).
-import { icoWorkshop, icoPaint, icoRange, icoUndo, icoCollection } from './icons.ts'
+// src/ui/stationBar.ts — 상단 스테이션 탭(공방/꾸미기/사격장/PVP/보관함) + 되돌리기 (leaf).
+import { icoWorkshop, icoPaint, icoRange, icoPvp, icoUndo, icoCollection } from './icons.ts'
 import { STATION_DEFS, STATION_ORDER, type StationIcon } from '../game/definitions.ts'
 import type { StationId } from '../game/definitions.ts'
 
@@ -14,6 +14,7 @@ const ICONS: Record<StationIcon, () => string> = {
   workshop: icoWorkshop,
   paint: icoPaint,
   range: icoRange,
+  pvp: icoPvp,
   collection: icoCollection,
 }
 

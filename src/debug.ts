@@ -10,6 +10,7 @@ export interface BlasterLabDebugState {
   frameCount: number
   editVisible: boolean
   rangeVisible: boolean
+  pvpVisible: boolean
   vmVisible: boolean
   geo: number
   calls: number
@@ -28,6 +29,7 @@ export interface BlasterLabDebugHandle {
   rotateState(): { mul: number; autoRotate: boolean; speed: number }
   step(frames?: number): { calls: number; hits: number; averageFrameMs: number }
   ammoState(): { ammoMax: number; ammoCur: number; reloading: boolean; reloadDurMs: number }
+  pvpState(): { phase: string; round: number; playerHealth: number; rivalHealth: number; selectedId: string | null }
   reload(): void
   state(): BlasterLabDebugState
   setMorph(slot: SlotType, key: MorphKey, t: number): void
