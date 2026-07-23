@@ -52,14 +52,15 @@ export function isSlotType(value: string): value is SlotType {
   return Object.hasOwn(SLOT_DEFS, value)
 }
 
-export type StationMode = 'edit' | 'range'
+export type StationMode = 'edit' | 'range' | 'pvp'
 export type StationPanel = 'workshop' | 'paint' | 'collection' | null
-export type StationIcon = 'workshop' | 'paint' | 'range' | 'collection'
+export type StationIcon = 'workshop' | 'paint' | 'range' | 'pvp' | 'collection'
 
 export const STATION_DEFS = {
   workshop: { labelKo: '만들기', mode: 'edit', panel: 'workshop', icon: 'workshop' },
   paint: { labelKo: '꾸미기', mode: 'edit', panel: 'paint', icon: 'paint' },
   range: { labelKo: '쏘기', mode: 'range', panel: null, icon: 'range' },
+  pvp: { labelKo: 'PVP', mode: 'pvp', panel: null, icon: 'pvp' },
   collection: { labelKo: '보관함', mode: 'edit', panel: 'collection', icon: 'collection' },
 } as const satisfies Record<string, { labelKo: string; mode: StationMode; panel: StationPanel; icon: StationIcon }>
 

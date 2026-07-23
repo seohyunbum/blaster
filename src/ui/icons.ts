@@ -28,6 +28,18 @@ export function icoRange(): string {
   </svg>`
 }
 
+export function icoPvp(): string {
+  return `<svg viewBox="0 0 24 24" width="24" height="24" aria-hidden="true">
+    <path d="M12 3 V6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+    <circle cx="12" cy="3" r="1.4" fill="currentColor"/>
+    <rect x="4" y="6" width="16" height="13" rx="5" fill="currentColor"/>
+    <circle cx="9" cy="11.5" r="1.5" fill="#fff"/>
+    <circle cx="15" cy="11.5" r="1.5" fill="#fff"/>
+    <path d="M8.5 15.5 H15.5" fill="none" stroke="#fff" stroke-width="1.8" stroke-linecap="round"/>
+    <path d="M2.5 11 H4 M20 11 H21.5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+  </svg>`
+}
+
 export function icoShoot(): string {
   return `<svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true">
     <circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" stroke-width="2"/>

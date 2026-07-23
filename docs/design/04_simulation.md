@@ -308,6 +308,15 @@ export interface ScoreState {
 
 모듈 배치: 탄도·판정·점수·탄도 해(`solveBallisticPitchRad`)·크기 합성(`composeProjectileScale`)·몬테카를로 시뮬 = `src/game/shooting/`(순수 로직, 단위테스트 대상. PRNG는 주입 가능한 `rand` 파라미터), 과녁·풍선·캔 메시 = `src/game/rangeVisuals.ts`, 점수판 HUD = `src/ui/`. main.ts는 배선만.
 
+## 13. PVP AI 드론 팝 아레나 (2026-07-24 현재 구현)
+
+- **라운드**: 무표정 구형 AI 드론 3기와 순차 1대1. 양측 체력은 매 라운드 10이며, 드론 완료 시 다음 라운드, 재도전·무승부는 같은 라운드를 다시 시작한다.
+- **팝 파워**: `popPower = 0.75 + (power - 1) / 12`로 0.75~1.5. 체력은 0 아래로 내려가지 않는다.
+- **연사·정확**: 기존 `ShotProfile`의 `fireIntervalMs` 600~150ms와 `spreadDeg` 4.0~0.3°를 그대로 사용한다.
+- **다루기**: `t = (handling - 1) / 9`, `aimFollowPerSec = 6 + 12t`, `strafeSpeed = 1.8 + 1.8t`. 플레이어 조준 추종·좌우 피하기와 AI 추적에 같은 축을 사용한다.
+- **물리**: 발사체 종류·탄속·중력·크기와 스윕 구 충돌은 사격장 정본을 재사용한다. 모드별 64발 풀, 고정 시드 `XorShift32`, AI 첫 반응 700ms를 사용한다.
+- **공정성**: 같은 프레임 양측 명중은 이전 체력 기준으로 동시에 계산한다. `capacity`·`reload`는 PVP 1차 범위에서 제외한다.
+
 ## 조립 섹션(02)에 넘기는 계약 (요약 — 이 계약이 스탯→발사 정본, 결정문 4)
 
 1. `ShotProfile`은 `kind`만 넘긴다 — `gravity` 필드 없음 (§2.1).

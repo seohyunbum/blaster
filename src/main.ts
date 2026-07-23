@@ -4,7 +4,7 @@ import * as THREE from 'three'
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js'
 
 import type { Blaster, MorphKey, SlotType, ZoneId } from './game/types.ts'
-import { CATALOG, computeStats } from './game/parts.ts'
+import { computeStats } from './game/parts.ts'
 import { boreScaleFromMorph } from './game/morph.ts'
 import {
   toShotProfile,
@@ -25,6 +25,8 @@ import {
 import { resumeAudio, sfx, setAudioEnabled } from './game/audio.ts'
 import { STATION_DEFS } from './game/definitions.ts'
 import { EditorSession } from './game/editorSession.ts'
+import { fitBlasterViewmodel } from './game/viewmodel.ts'
+import type { PvpMode } from './modes/pvpMode.ts'
 
 import { createStationBar, type StationId } from './ui/stationBar.ts'
 import { createWorkshopPanel } from './ui/workshopPanel.ts'
@@ -42,6 +44,8 @@ const barHost = el('div', 'bar-host')
 const panelHost = el('div', 'panel-host')
 const hudHost = el('div', 'hud-host')
 app.append(canvasHost, barHost, panelHost, hudHost)
+const rangeHudRoot = el('div', 'range-hud-root')
+hudHost.appendChild(rangeHudRoot)
 
 // 공방 3D 뷰 위 회전 속도 컨트롤 오버레이
 const editOverlay = el('div', 'edit-overlay')
@@ -118,6 +122,9 @@ let station: StationId = 'workshop'
 let booted = false
 let editBuilt: BuiltBlaster | null = null
 let vmBuilt: BuiltBlaster | null = null
+let pvpMode: PvpMode | null = null
+let pvpModeLoad: Promise<PvpMode> | null = null
+let pvpEnterGeneration = 0
 
 function pickActive(s: SavedGame): Blaster {
   return s.blasters.find((b) => b.id === s.activeBlasterId) ?? s.blasters[0]!
@@ -139,7 +146,7 @@ const workshopPanel = createWorkshopPanel(wsRoot, {
 })
 
 let paintPanel: ReturnType<typeof createPaintPanel> | null = null
-const rangeHud = createRangeHud(hudHost, {
+const rangeHud = createRangeHud(rangeHudRoot, {
   onBack: () => finishRange(),
   onRetry: () => retryRange(),
   onExit: () => setStation('workshop'),
@@ -149,7 +156,7 @@ const rangeHud = createRangeHud(hudHost, {
 const rotateControl = createRotateControl(editOverlay, {
   onSelect: (mul) => {
     rotateSpeedMul = mul
-    applyRotation(station !== 'range')
+    applyRotation(STATION_DEFS[station].mode === 'edit')
     rotateControl.setActive(mul)
   },
 })
@@ -165,6 +172,51 @@ const collectionPanel = createCollectionPanel(collectionRoot, {
   onImportFile: (file) => importBackup(file),
 })
 
+function loadPvpMode(): Promise<PvpMode> {
+  if (pvpMode) return Promise.resolve(pvpMode)
+  if (pvpModeLoad) return pvpModeLoad
+
+  pvpModeLoad = import('./modes/pvpMode.ts')
+    .then((module) => {
+      const mode = new module.PvpMode({
+        scene,
+        camera,
+        canvas: renderer.domElement,
+        hudHost,
+        callbacks: {
+          onSelectBlaster: (id) => {
+            const selected = activateOwnedBlaster(id)
+            if (!selected) return
+            stationBar.setName(selected.name)
+            autosave()
+          },
+          onCollection: () => setStation('collection'),
+        },
+      })
+      pvpMode = mode
+      return mode
+    })
+    .catch((error: unknown) => {
+      pvpModeLoad = null
+      throw error
+    })
+  return pvpModeLoad
+}
+
+async function enterPvpMode(): Promise<void> {
+  const generation = ++pvpEnterGeneration
+  try {
+    const mode = await loadPvpMode()
+    if (station !== 'pvp' || generation !== pvpEnterGeneration) return
+    mode.enter(save.blasters, active.id)
+    stationBar.setCanUndo(false)
+  } catch (error) {
+    if (station !== 'pvp' || generation !== pvpEnterGeneration) return
+    console.error('PVP 모드를 불러오지 못했습니다.', error)
+    setStation('collection')
+  }
+}
+
 // ─── 편집 뷰 재빌드 ─────────────────────────────────────────
 function rebuildEdit(lod?: 'drag' | 'full'): void {
   if (editBuilt) {
@@ -175,43 +227,6 @@ function rebuildEdit(lod?: 'drag' | 'full'): void {
   editRoot.add(editBuilt.group)
 }
 
-const _vmBox = new THREE.Box3()
-const _vmSize = new THREE.Vector3()
-const _vmCenter = new THREE.Vector3()
-/**
- * 쏘기 화면 총(뷰모델) 위치를 착용 파츠에 따라 조정 (사용자 요청 — 모든 총을 내리지 않는다).
- * - 미니건 이름 파츠 다 착용(미니건 코어 + 미니건 손잡이): 크게 축소 + 화면 아래로 쭉 내림.
- * - 리볼버 파츠 착용(리볼버 실린더/그립): 조금만 아래로.
- * - 그 외: 기존 위치·크기 그대로.
- */
-function fitViewmodel(g: THREE.Object3D): void {
-  g.scale.setScalar(1)
-  g.position.set(0, 0, 0)
-  const bodyId = active.parts.body?.partId
-  const gripId = active.parts.grip?.partId
-  const magId = active.parts.magazine?.partId
-  const isFullMinigun =
-    CATALOG.get(bodyId ?? '')?.capabilities?.viewmodelFit === 'oversize' &&
-    CATALOG.get(gripId ?? '')?.capabilities?.viewmodelFit === 'oversize'
-  const hasRevolver = [gripId, magId].some(
-    (id) => CATALOG.get(id ?? '')?.capabilities?.viewmodelFit === 'compact',
-  )
-  if (isFullMinigun) {
-    g.updateMatrixWorld(true)
-    _vmBox.setFromObject(g)
-    _vmBox.getSize(_vmSize)
-    _vmBox.getCenter(_vmCenter)
-    // 화면 가리는 가로·세로(x·y) 기준 축소(깊이 z 제외). 총 윗부분이 화면 하단에 오도록 매달기.
-    const screenDim = Math.max(_vmSize.x, _vmSize.y)
-    const TARGET = 0.34
-    const s = screenDim > TARGET ? TARGET / screenDim : 1
-    g.scale.setScalar(s)
-    g.position.set(-_vmCenter.x * s, -(_vmCenter.y + _vmSize.y / 2) * s, -_vmCenter.z * s)
-  } else if (hasRevolver) {
-    g.position.y = -0.05 // 조금만 아래로 (아주 살짝 위로 조정)
-  }
-}
-
 function rebuildViewmodel(): void {
   if (vmBuilt) {
     viewmodel.remove(vmBuilt.group)
@@ -219,7 +234,7 @@ function rebuildViewmodel(): void {
   }
   vmBuilt = buildBlaster(active, 'full')
   viewmodel.add(vmBuilt.group)
-  fitViewmodel(vmBuilt.group)
+  fitBlasterViewmodel(active, vmBuilt.group)
 }
 
 function refreshPanels(): void {
@@ -245,15 +260,18 @@ function setStation(id: StationId): void {
   const stationDef = STATION_DEFS[id]
   const editMode = stationDef.mode === 'edit'
   app.classList.toggle('range-mode', stationDef.mode === 'range')
+  app.classList.toggle('pvp-mode', stationDef.mode === 'pvp')
   editRoot.visible = editMode
   range.group.visible = stationDef.mode === 'range'
   viewmodel.visible = stationDef.mode === 'range'
+  if (stationDef.mode !== 'pvp') pvpMode?.leave()
   controls.enabled = editMode
   applyRotation(editMode)
   editOverlay.style.display = editMode ? '' : 'none'
 
   panelHost.style.display = editMode ? '' : 'none'
-  hudHost.style.display = stationDef.mode === 'range' ? '' : 'none'
+  hudHost.style.display = editMode ? 'none' : ''
+  rangeHudRoot.style.display = stationDef.mode === 'range' ? '' : 'none'
 
   if (editMode) {
     rangeSession.selectAim(null, camera)
@@ -273,8 +291,10 @@ function setStation(id: StationId): void {
     collectionRoot.style.display = stationDef.panel === 'collection' ? '' : 'none'
     rebuildEdit('full')
     refreshPanels()
-  } else {
+  } else if (stationDef.mode === 'range') {
     enterRange()
+  } else {
+    void enterPvpMode()
   }
 }
 
@@ -294,9 +314,9 @@ function newBlaster(): void {
   openBlaster(b.id, 'workshop')
 }
 
-function openBlaster(id: string, goto?: StationId): void {
+function activateOwnedBlaster(id: string): Blaster | null {
   const b = save.blasters.find((x) => x.id === id)
-  if (!b) return
+  if (!b) return null
   // 같은 블래스터를 다시 여는 건(활성 카드의 "만들기") 전환이 아니다 —
   // undo 스택을 소거하지 않는다(스테이션 탭으로 가는 경로와 동작 일치)
   if (b.id !== active.id) {
@@ -304,6 +324,11 @@ function openBlaster(id: string, goto?: StationId): void {
     save.activeBlasterId = id
     editor.setActive(active)
   }
+  return b
+}
+
+function openBlaster(id: string, goto?: StationId): void {
+  if (!activateOwnedBlaster(id)) return
   sfx.click()
   autosave()
   if (goto) {
@@ -635,6 +660,8 @@ function tick(): void {
     } else if (rangeSession.reloadProgress !== null) {
       syncAmmo(rangeSession.reloadProgress)
     }
+  } else if (station === 'pvp') {
+    pvpMode?.update(dt, now)
   } else {
     // 드래그 중 쌓인 morph 변경을 프레임당 1회만 재빌드 (코얼레싱)
     if (editor.consumeMorphDirty()) {
@@ -707,10 +734,12 @@ const debugHandle: BlasterLabDebugHandle = {
     const frames = Math.max(1, Math.floor(n))
     const startedAt = performance.now()
     for (let i = 0; i < frames; i++) {
+      const stepNow = startedAt + ((i + 1) * 1000) / 60
       if (station === 'range') {
-        const now = performance.now()
-        rangeSession.update(1 / 60, now, camera, range)
+        rangeSession.update(1 / 60, stepNow, camera, range)
         if (rangeSession.reloadCompleted) syncAmmo()
+      } else if (station === 'pvp') {
+        pvpMode?.update(1 / 60, stepNow)
       }
       renderer.render(scene, camera)
     }
@@ -726,6 +755,13 @@ const debugHandle: BlasterLabDebugHandle = {
     reloading: rangeSession.reloading,
     reloadDurMs: rangeSession.reloadDurMs,
   }),
+  pvpState: () => pvpMode?.snapshot() ?? {
+    phase: 'lobby',
+    round: 1,
+    playerHealth: 10,
+    rivalHealth: 10,
+    selectedId: active.id,
+  },
   reload: () => startReload(),
   state: () => ({
     station,
@@ -734,6 +770,7 @@ const debugHandle: BlasterLabDebugHandle = {
     frameCount,
     editVisible: editRoot.visible,
     rangeVisible: range.group.visible,
+    pvpVisible: pvpMode?.isVisible ?? false,
     vmVisible: viewmodel.visible,
     geo: renderer.info.memory.geometries,
     calls: renderer.info.render.calls,

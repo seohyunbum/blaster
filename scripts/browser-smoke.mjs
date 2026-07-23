@@ -101,9 +101,50 @@ try {
     `range average frame ${range.step.averageFrameMs}ms > ${PERFORMANCE_BUDGETS.maxAverageFrameMs}ms`,
   )
 
+  await page.evaluate(() => window.__blasterLab?.setStation('pvp'))
+  await page.locator('.pvp-lobby').waitFor({ state: 'visible' })
+  const ownedCount = await page.locator('.pvp-loadout-card').count()
+  assert.equal(
+    ownedCount,
+    await page.evaluate(() => window.__blasterLab?.save.blasters.length),
+    'PVP 로비가 보관함 블래스터만 표시해야 함',
+  )
+  await page.locator('.pvp-start').first().click()
+  const pvp = await page.evaluate(() => {
+    const step = window.__blasterLab?.step(12)
+    return {
+      step,
+      pvp: window.__blasterLab?.pvpState(),
+      state: window.__blasterLab?.state(),
+      info: window.__blasterLab?.rendererInfo(),
+    }
+  })
+  assert.ok(pvp.step)
+  assert.ok(pvp.pvp)
+  assert.ok(pvp.state)
+  assert.ok(pvp.info)
+  assert.equal(pvp.state.station, 'pvp')
+  assert.equal(pvp.state.pvpVisible, true)
+  assert.equal(pvp.pvp.phase, 'playing')
+  assert.equal(pvp.pvp.playerHealth, 10)
+  assert.equal(pvp.pvp.rivalHealth, 10)
+  assert.match(await page.locator('.pvp-round').innerText(), /1 \/ 3/)
+  assert.ok(
+    pvp.info.calls <= PERFORMANCE_BUDGETS.maxSceneDrawCalls,
+    `pvp draw calls ${pvp.info.calls} > ${PERFORMANCE_BUDGETS.maxSceneDrawCalls}`,
+  )
+  assert.ok(
+    pvp.info.visibleMeshes <= PERFORMANCE_BUDGETS.maxVisibleMeshes,
+    `pvp visible meshes ${pvp.info.visibleMeshes} > ${PERFORMANCE_BUDGETS.maxVisibleMeshes}`,
+  )
+  assert.ok(
+    pvp.step.averageFrameMs <= PERFORMANCE_BUDGETS.maxAverageFrameMs,
+    `pvp average frame ${pvp.step.averageFrameMs}ms > ${PERFORMANCE_BUDGETS.maxAverageFrameMs}ms`,
+  )
+
   assert.deepEqual(browserErrors, [])
   console.log(
-    `browser smoke ok: workshop ${workshop.info.calls} calls/${workshop.info.visibleMeshes} meshes, range ${range.info.calls} calls/${range.info.visibleMeshes} meshes/${range.step.averageFrameMs.toFixed(2)}ms, geometries ${baselineGeometries}->${rebuilt.geometries}, finish delta ${(finishDelta * 100).toFixed(2)}%`,
+    `browser smoke ok: workshop ${workshop.info.calls} calls/${workshop.info.visibleMeshes} meshes, range ${range.info.calls} calls/${range.info.visibleMeshes} meshes/${range.step.averageFrameMs.toFixed(2)}ms, pvp ${pvp.info.calls} calls/${pvp.info.visibleMeshes} meshes/${pvp.step.averageFrameMs.toFixed(2)}ms, geometries ${baselineGeometries}->${rebuilt.geometries}, finish delta ${(finishDelta * 100).toFixed(2)}%`,
   )
 } finally {
   await browser?.close()

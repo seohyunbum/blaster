@@ -35,7 +35,8 @@ function isHotpath(node, relPath) {
   const name = functionName(node)
   if (!name) return false
   if (/^(?:tick|animate)/.test(name)) return true
-  return relPath.startsWith('src/game/') && /^update/.test(name)
+  return (relPath.startsWith('src/game/') || relPath.startsWith('src/modes/'))
+    && /^update/.test(name)
 }
 
 function allocationLabel(node, sourceFile) {

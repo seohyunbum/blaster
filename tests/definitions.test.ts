@@ -35,7 +35,9 @@ test('스테이션은 명시적 mode와 panel 정책을 가진다', () => {
   assert.deepEqual(STATION_ORDER, Object.keys(STATION_DEFS))
   assert.equal(STATION_DEFS.range.mode, 'range')
   assert.equal(STATION_DEFS.range.panel, null)
-  for (const id of STATION_ORDER.filter((station) => station !== 'range')) {
+  assert.equal(STATION_DEFS.pvp.mode, 'pvp')
+  assert.equal(STATION_DEFS.pvp.panel, null)
+  for (const id of STATION_ORDER.filter((station) => STATION_DEFS[station].mode === 'edit')) {
     assert.equal(STATION_DEFS[id].mode, 'edit', `${id}가 사격장으로 fallthrough하면 안 됨`)
     assert.ok(STATION_DEFS[id].panel)
   }
