@@ -16,10 +16,9 @@ import { createPvpHud } from '../ui/pvpHud.ts'
 const PLAYER_Y = 1.45
 const PLAYER_START_Z = 9
 const PLAYER_RADIUS = 0.45
-const LOOK_SENSITIVITY = 0.0024
-const PITCH_LIMIT = 1.2
+const LOOK_SENSITIVITY = 0.0034 // 마우스 시야 회전 감도 (화면 더 잘 돌아가게 상향)
+const PITCH_LIMIT = 1.25
 const STAGE_COUNT = 5
-const POPS_PER_STAGE = 3
 const START_HEALTH = 10
 
 export interface PvpModeCallbacks {
@@ -82,7 +81,6 @@ export class PvpMode {
   private health = START_HEALTH
   private kills = 0
   private stage = 1
-  private stagePops = 0
   private nextFireAt = 0
 
   constructor(options: PvpModeOptions) {
@@ -210,26 +208,24 @@ export class PvpMode {
     if (newKills > 0) {
       this.kills += newKills
       sfx.pop()
-      for (let i = 0; i < newKills && this.phase === 'playing'; i++) this.registerPop()
     }
+    // 보스를 잡으면 스테이지 클리어 → 다음 스테이지(새 맵·더 센 보스)
+    if (this.phase === 'playing' && this.arena.consumeBossDown()) this.advanceStage()
     this.renderStatus()
 
     if (this.phase === 'playing' && this.health <= 0) this.endMatch()
   }
 
-  /** 적 1기 팝 처리 — 스테이지 진행. 스테이지당 POPS_PER_STAGE 팝, 5스테이지 다 하면 클리어. */
-  private registerPop(): void {
-    this.stagePops += 1
-    if (this.stagePops < POPS_PER_STAGE) return
-    this.stagePops = 0
+  /** 보스 격파 — 다음 스테이지로. 5스테이지 다 깨면 클리어. */
+  private advanceStage(): void {
     this.stage += 1
     if (this.stage > STAGE_COUNT) {
       this.clearRun()
       return
     }
-    // 스테이지 클리어 — 체력 +2 보상 + 적이 조금 더 세짐
-    this.health = Math.min(START_HEALTH, this.health + 2)
-    this.arena.setDifficulty(1 + (this.stage - 1) * 0.14)
+    this.health = Math.min(START_HEALTH, this.health + 2) // 스테이지 클리어 보상
+    this.arena.setDifficulty(1 + (this.stage - 1) * 0.16) // 적이 더 세짐
+    this.arena.setStage(this.stage) // 새 맵 + 더 센 보스
     sfx.star()
   }
 
@@ -274,7 +270,6 @@ export class PvpMode {
     this.health = START_HEALTH
     this.kills = 0
     this.stage = 1
-    this.stagePops = 0
     this.playerX = 0
     this.playerZ = PLAYER_START_Z
     this.targetYaw = 0
@@ -308,7 +303,7 @@ export class PvpMode {
 
   private renderStatus(): void {
     this.statusEl.textContent =
-      `❤️ ${this.health} · 스테이지 ${this.stage}/${STAGE_COUNT} · 팝 ${this.stagePops}/${POPS_PER_STAGE} · 적 ${this.arena.aliveEnemies}`
+      `❤️ ${this.health} · 스테이지 ${this.stage}/${STAGE_COUNT} · 👑 ${this.arena.bossHealth}/${this.arena.bossMaxHealth} · 적 ${this.arena.aliveEnemies}`
   }
 
   private rebuildViewmodel(blaster: Blaster): void {
