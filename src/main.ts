@@ -35,6 +35,7 @@ import { createRangeHud } from './ui/rangeHud.ts'
 import type { AimSel } from './ui/rangeHud.ts'
 import { createRotateControl } from './ui/rotateControl.ts'
 import { createCollectionPanel } from './ui/collectionPanel.ts'
+import { createStreakBadge } from './ui/streakBadge.ts'
 import type { BlasterLabDebugHandle } from './debug.ts'
 
 // ─── DOM ────────────────────────────────────────────────────
@@ -162,6 +163,8 @@ const rotateControl = createRotateControl(editOverlay, {
 })
 rotateControl.setActive(1)
 
+const streakBadge = createStreakBadge(app)
+
 const collectionPanel = createCollectionPanel(collectionRoot, {
   onNew: () => newBlaster(),
   onOpen: (id) => openBlaster(id, 'workshop'),
@@ -191,6 +194,10 @@ function loadPvpMode(): Promise<PvpMode> {
             autosave()
           },
           onCollection: () => setStation('collection'),
+          onClearRun: () => {
+            streakBadge.increment()
+            setStation('workshop')
+          },
         },
       })
       pvpMode = mode
@@ -259,6 +266,7 @@ function setStation(id: StationId): void {
 
   const stationDef = STATION_DEFS[id]
   const editMode = stationDef.mode === 'edit'
+  streakBadge.setVisible(id === 'workshop') // 연승은 만들기 화면 위쪽에만
   app.classList.toggle('range-mode', stationDef.mode === 'range')
   app.classList.toggle('pvp-mode', stationDef.mode === 'pvp')
   editRoot.visible = editMode
