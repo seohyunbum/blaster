@@ -18,12 +18,15 @@ const PLAYER_START_Z = 9
 const PLAYER_RADIUS = 0.45
 const LOOK_SENSITIVITY = 0.0024
 const PITCH_LIMIT = 1.2
-const TARGET_KILLS = 15
+const STAGE_COUNT = 5
+const POPS_PER_STAGE = 3
 const START_HEALTH = 10
 
 export interface PvpModeCallbacks {
   onSelectBlaster: (blasterId: string) => void
   onCollection: () => void
+  /** 5스테이지 전부 클리어 시 — 연승 +1 하고 만들기 화면으로. */
+  onClearRun: () => void
 }
 
 export interface PvpModeOptions {
@@ -78,6 +81,8 @@ export class PvpMode {
   private playerZ = PLAYER_START_Z
   private health = START_HEALTH
   private kills = 0
+  private stage = 1
+  private stagePops = 0
   private nextFireAt = 0
 
   constructor(options: PvpModeOptions) {
@@ -205,11 +210,36 @@ export class PvpMode {
     if (newKills > 0) {
       this.kills += newKills
       sfx.pop()
+      for (let i = 0; i < newKills && this.phase === 'playing'; i++) this.registerPop()
     }
     this.renderStatus()
 
-    if (this.health <= 0) this.endMatch('lost')
-    else if (this.kills >= TARGET_KILLS) this.endMatch('won')
+    if (this.phase === 'playing' && this.health <= 0) this.endMatch()
+  }
+
+  /** 적 1기 팝 처리 — 스테이지 진행. 스테이지당 POPS_PER_STAGE 팝, 5스테이지 다 하면 클리어. */
+  private registerPop(): void {
+    this.stagePops += 1
+    if (this.stagePops < POPS_PER_STAGE) return
+    this.stagePops = 0
+    this.stage += 1
+    if (this.stage > STAGE_COUNT) {
+      this.clearRun()
+      return
+    }
+    // 스테이지 클리어 — 체력 +2 보상 + 적이 조금 더 세짐
+    this.health = Math.min(START_HEALTH, this.health + 2)
+    this.arena.setDifficulty(1 + (this.stage - 1) * 0.14)
+    sfx.star()
+  }
+
+  private clearRun(): void {
+    this.phase = 'won'
+    this.firing = false
+    if (this.pointerLocked && document.pointerLockElement === this.canvas) document.exitPointerLock()
+    this.arenaHud.style.display = 'none'
+    sfx.star()
+    this.callbacks.onClearRun() // 연승 +1 + 만들기 화면으로 (main 이 처리)
   }
 
   get isVisible(): boolean {
@@ -243,6 +273,8 @@ export class PvpMode {
 
     this.health = START_HEALTH
     this.kills = 0
+    this.stage = 1
+    this.stagePops = 0
     this.playerX = 0
     this.playerZ = PLAYER_START_Z
     this.targetYaw = 0
@@ -264,23 +296,19 @@ export class PvpMode {
     if (this.selectedId) this.startMatch(this.selectedId, nowMs)
   }
 
-  private endMatch(result: 'won' | 'lost'): void {
-    this.phase = result
+  private endMatch(): void {
+    // 패배 (체력 0)
+    this.phase = 'lost'
     this.firing = false
     if (this.pointerLocked && document.pointerLockElement === this.canvas) document.exitPointerLock()
     this.outcomeEl.style.display = 'flex'
-    if (result === 'won') {
-      this.outcomeTitle.textContent = '아레나 챔피언! 🏆'
-      this.outcomeDetail.textContent = `적 드론 ${TARGET_KILLS}대를 물리쳤어요! 대단해요!`
-      sfx.star()
-    } else {
-      this.outcomeTitle.textContent = '체력이 다 됐어요'
-      this.outcomeDetail.textContent = `팝 ${this.kills}대. 엄폐물 뒤에 숨으며 다시 도전해요!`
-    }
+    this.outcomeTitle.textContent = '체력이 다 됐어요'
+    this.outcomeDetail.textContent = `스테이지 ${this.stage}에서 멈췄어요. 엄폐물 뒤에 숨으며 다시 도전!`
   }
 
   private renderStatus(): void {
-    this.statusEl.textContent = `❤️ ${this.health} · 팝 ${this.kills}/${TARGET_KILLS} · 적 ${this.arena.aliveEnemies}`
+    this.statusEl.textContent =
+      `❤️ ${this.health} · 스테이지 ${this.stage}/${STAGE_COUNT} · 팝 ${this.stagePops}/${POPS_PER_STAGE} · 적 ${this.arena.aliveEnemies}`
   }
 
   private rebuildViewmodel(blaster: Blaster): void {

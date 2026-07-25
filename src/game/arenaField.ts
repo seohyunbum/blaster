@@ -118,6 +118,7 @@ export class ArenaField {
   private killsThisFrame = 0
   private playerDamageThisFrame = 0
   private loadoutCursor = 0
+  private difficulty = 1 // 스테이지가 올라갈수록 적이 조금씩 빨라짐
 
   private readonly scratchDir = new THREE.Vector3()
   private readonly sweepPrev: Vec3 = { x: 0, y: 0, z: 0 }
@@ -184,8 +185,14 @@ export class ArenaField {
     this.reset()
     this.rngState = (seed >>> 0) || DEFAULT_SEED
     this.loadoutCursor = 0
+    this.difficulty = 1
     for (const enemy of this.enemies) this.spawnEnemy(enemy)
     this.group.visible = true
+  }
+
+  /** 스테이지 난이도(적 속도·연사) 배율. 1=기본. */
+  setDifficulty(mult: number): void {
+    this.difficulty = mult > 0.5 ? mult : 1
   }
 
   reset(): void {
@@ -260,7 +267,7 @@ export class ArenaField {
     const dist = Math.hypot(dx, dz)
     if (dist < 0.4) this.pickWanderTarget(enemy)
     else {
-      const step = Math.min(dist, ENEMY_SPEED * dt)
+      const step = Math.min(dist, ENEMY_SPEED * this.difficulty * dt)
       let nx = enemy.pos.x + (dx / dist) * step
       let nz = enemy.pos.z + (dz / dist) * step
       // 엄폐물에 부딪히면 목표 새로 뽑기(관통 방지)
@@ -285,7 +292,7 @@ export class ArenaField {
     // 발사
     enemy.fireIn -= dt
     if (enemy.fireIn <= 0) {
-      enemy.fireIn = ENEMY_FIRE_MIN + this.rand() * (ENEMY_FIRE_MAX - ENEMY_FIRE_MIN)
+      enemy.fireIn = (ENEMY_FIRE_MIN + this.rand() * (ENEMY_FIRE_MAX - ENEMY_FIRE_MIN)) / this.difficulty
       this.scratchDir
         .set(playerPos.x - enemy.pos.x, playerPos.y - (ENEMY_HOVER_Y), playerPos.z - enemy.pos.z)
         .normalize()
