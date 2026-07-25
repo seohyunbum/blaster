@@ -1,32 +1,25 @@
-// src/modes/pvpMode.ts — PVP 로비·세션·3D 무대·입력을 연결하는 모드 조정자.
+// src/modes/pvpMode.ts — 아레나 FPS PVP: WASD 자유 이동 + 마우스 자유 시야 + 여러 적 로밍 + 엄폐물.
+// 무대·물리는 game/arenaField.ts(신규, 자체 완결). 협업자의 pvpArena/pvpSession/pvpHud 는 로비만 재사용.
 import * as THREE from 'three'
+import { ArenaField } from '../game/arenaField.ts'
 import { buildBlaster, type BuiltBlaster } from '../game/assembly.ts'
 import { sfx } from '../game/audio.ts'
 import { toShotProfile } from '../game/ballistics.ts'
 import { boreScaleFromMorph } from '../game/morph.ts'
 import { computeStats } from '../game/parts.ts'
-import { PvpArena } from '../game/pvpArena.ts'
 import { PVP_LOADOUTS } from '../game/pvpLoadouts.ts'
-import {
-  PVP_ROUND_COUNT,
-  PvpSession,
-  toPvpProfile,
-  type PvpFrameImpacts,
-  type PvpProfile,
-} from '../game/pvpSession.ts'
+import { toPvpProfile, type PvpProfile } from '../game/pvpSession.ts'
 import type { Blaster, PartInstance, SlotType } from '../game/types.ts'
 import { fitBlasterViewmodel } from '../game/viewmodel.ts'
 import { createPvpHud } from '../ui/pvpHud.ts'
 
 const PLAYER_Y = 1.45
-const PLAYER_Z = 0.7
-const MOVE_BOUND_X = 9
-const MOVE_BOUND_Z_MIN = -7
-const MOVE_BOUND_Z_MAX = 9
-const LOOK_SENSITIVITY = 0.0024 // 포인터락 마우스 이동(px) → 회전(rad)
-const PITCH_LIMIT = 1.2 // 위아래 시야 제한(rad)
-const RIVAL_REACTION_MS = 700
-const BASE_MATCH_SEED = 0x51f15e
+const PLAYER_START_Z = 9
+const PLAYER_RADIUS = 0.45
+const LOOK_SENSITIVITY = 0.0024
+const PITCH_LIMIT = 1.2
+const TARGET_KILLS = 15
+const START_HEALTH = 10
 
 export interface PvpModeCallbacks {
   onSelectBlaster: (blasterId: string) => void
@@ -41,42 +34,51 @@ export interface PvpModeOptions {
   callbacks: PvpModeCallbacks
 }
 
+type Phase = 'lobby' | 'playing' | 'won' | 'lost'
+
 export class PvpMode {
   private readonly camera: THREE.PerspectiveCamera
   private readonly canvas: HTMLCanvasElement
   private readonly callbacks: PvpModeCallbacks
-  private readonly arena = new PvpArena()
+  private readonly arena = new ArenaField()
   private readonly viewmodel = new THREE.Group()
   private readonly hudRoot = document.createElement('div')
   private readonly hud
-  private readonly rivalProfiles: readonly PvpProfile[]
-  private readonly impactFrame: PvpFrameImpacts = {
-    playerPopPower: 0,
-    rivalPopPower: 0,
-  }
+  private readonly enemyProfile: PvpProfile
+
   private readonly aimEuler = new THREE.Euler(0, 0, 0, 'YXZ')
   private readonly fireOrigin = new THREE.Vector3()
-  private readonly fireDirection = new THREE.Vector3()
+  private readonly fireDir = new THREE.Vector3()
+
+  // 아레나 HUD (자체 DOM — 협업자 pvpHud 전투/결과 화면과 분리)
+  private readonly arenaHud: HTMLElement
+  private readonly statusEl: HTMLElement
+  private readonly outcomeEl: HTMLElement
+  private readonly outcomeTitle: HTMLElement
+  private readonly outcomeDetail: HTMLElement
 
   private ownedBlasters: readonly Blaster[] = []
   private selectedId: string | null = null
-  private playerBlaster: Blaster | null = null
   private playerBuilt: BuiltBlaster | null = null
-  private session: PvpSession | null = null
+  private playerProfile: PvpProfile | null = null
+  private phase: Phase = 'lobby'
   private active = false
+
   private firing = false
-  private movingLeft = false
-  private movingRight = false
-  private movingForward = false
-  private movingBack = false
+  private moveF = false
+  private moveB = false
+  private moveL = false
+  private moveR = false
   private pointerLocked = false
   private targetYaw = 0
   private targetPitch = 0
   private aimYaw = 0
   private aimPitch = 0
   private playerX = 0
-  private playerZ = PLAYER_Z
-  private roundStartedAt = 0
+  private playerZ = PLAYER_START_Z
+  private health = START_HEALTH
+  private kills = 0
+  private nextFireAt = 0
 
   constructor(options: PvpModeOptions) {
     this.camera = options.camera
@@ -91,13 +93,40 @@ export class PvpMode {
     options.hudHost.appendChild(this.hudRoot)
     this.hud = createPvpHud(this.hudRoot, {
       onStart: (id) => this.startMatch(id, performance.now()),
-      onNext: () => this.advanceRound(performance.now()),
-      onRetry: () => this.retry(performance.now()),
+      onNext: () => {},
+      onRetry: () => {},
       onCollection: () => this.callbacks.onCollection(),
     })
     this.hud.setVisible(false)
 
-    this.rivalProfiles = Object.freeze(PVP_LOADOUTS.map((loadout) => profileFor(loadout.blaster)))
+    // ── 아레나 HUD DOM (인라인 스타일, 자체 완결) ──
+    this.arenaHud = document.createElement('div')
+    this.arenaHud.style.cssText =
+      'position:absolute;inset:0;pointer-events:none;z-index:20;display:none;font-family:system-ui,sans-serif'
+    const cross = document.createElement('div')
+    cross.style.cssText =
+      'position:absolute;left:50%;top:50%;width:12px;height:12px;margin:-6px 0 0 -6px;border:2px solid #fff;border-radius:50%;box-shadow:0 0 3px rgba(0,0,0,.5)'
+    this.statusEl = document.createElement('div')
+    this.statusEl.style.cssText =
+      'position:absolute;top:14px;left:50%;transform:translateX(-50%);background:rgba(30,60,90,.72);color:#fff;font-weight:700;font-size:17px;padding:8px 18px;border-radius:999px'
+    this.outcomeEl = document.createElement('div')
+    this.outcomeEl.style.cssText =
+      'position:absolute;inset:0;display:none;align-items:center;justify-content:center;background:rgba(20,40,70,.45);pointer-events:auto'
+    const card = document.createElement('div')
+    card.style.cssText =
+      'background:#fff;border-radius:22px;padding:26px 30px;text-align:center;box-shadow:0 12px 40px rgba(0,0,0,.25);max-width:340px'
+    this.outcomeTitle = document.createElement('h2')
+    this.outcomeTitle.style.cssText = 'margin:0 0 8px;font-size:26px;color:#2f7fe8'
+    this.outcomeDetail = document.createElement('p')
+    this.outcomeDetail.style.cssText = 'margin:0 0 18px;font-size:15px;color:#555'
+    const retry = mkButton('다시 도전!', '#ff8a2b', () => this.retry(performance.now()))
+    const back = mkButton('보관함으로', '#8aa0b8', () => this.callbacks.onCollection())
+    card.append(this.outcomeTitle, this.outcomeDetail, retry, back)
+    this.outcomeEl.appendChild(card)
+    this.arenaHud.append(cross, this.statusEl, this.outcomeEl)
+    options.hudHost.appendChild(this.arenaHud)
+
+    this.enemyProfile = profileFor(PVP_LOADOUTS[0]!.blaster)
     this.installInput()
   }
 
@@ -105,12 +134,12 @@ export class PvpMode {
     this.active = true
     this.ownedBlasters = blasters
     this.selectedId = activeId
-    this.session = null
-    this.playerBlaster = null
+    this.phase = 'lobby'
     this.resetInput()
     this.arena.reset()
     this.arena.visible = true
     this.viewmodel.visible = false
+    this.arenaHud.style.display = 'none'
     this.configureCamera()
     this.hud.setVisible(true)
     this.hud.showLobby(blasters, activeId)
@@ -118,68 +147,69 @@ export class PvpMode {
 
   leave(): void {
     this.active = false
-    this.session = null
+    this.phase = 'lobby'
     this.resetInput()
     this.arena.reset()
     this.arena.visible = false
     this.viewmodel.visible = false
     this.hud.setVisible(false)
+    this.arenaHud.style.display = 'none'
   }
 
   update(dt: number, nowMs: number): void {
-    const session = this.session
-    if (!this.active || !session || session.phase !== 'playing') return
+    if (!this.active || this.phase !== 'playing') return
+    const profile = this.playerProfile
+    if (!profile) return
 
-    const playerProfile = session.playerProfile
-    // 화면(마우스룩)은 즉시 반영 — 마우스로 자유롭게 빙 둘러본다
+    // 마우스 시야 즉시 반영
     this.aimYaw = this.targetYaw
     this.aimPitch = clamp(this.targetPitch, -PITCH_LIMIT, PITCH_LIMIT)
 
-    // WASD 자유 이동 (보는 방향 기준): W/S=앞뒤, A/D=좌우
-    const forward = (this.movingForward ? 1 : 0) - (this.movingBack ? 1 : 0)
-    const strafe = (this.movingRight ? 1 : 0) - (this.movingLeft ? 1 : 0)
+    // WASD 이동 (보는 방향 기준) + 엄폐물/경계 충돌
+    const forward = (this.moveF ? 1 : 0) - (this.moveB ? 1 : 0)
+    const strafe = (this.moveR ? 1 : 0) - (this.moveL ? 1 : 0)
     if (forward !== 0 || strafe !== 0) {
-      const speed = Math.max(2.6, playerProfile.strafeSpeed * 1.5)
+      const speed = Math.max(3, profile.strafeSpeed * 1.6)
       const sinY = Math.sin(this.aimYaw)
       const cosY = Math.cos(this.aimYaw)
-      const moveX = forward * -sinY + strafe * cosY
-      const moveZ = forward * -cosY + strafe * -sinY
-      const len = Math.hypot(moveX, moveZ) || 1
-      this.playerX = clamp(this.playerX + (moveX / len) * speed * dt, -MOVE_BOUND_X, MOVE_BOUND_X)
-      this.playerZ = clamp(this.playerZ + (moveZ / len) * speed * dt, MOVE_BOUND_Z_MIN, MOVE_BOUND_Z_MAX)
+      const mx = forward * -sinY + strafe * cosY
+      const mz = forward * -cosY + strafe * -sinY
+      const len = Math.hypot(mx, mz) || 1
+      const nx = this.playerX + (mx / len) * speed * dt
+      const nz = this.playerZ + (mz / len) * speed * dt
+      this.arena.resolvePlayer(nx, nz, PLAYER_RADIUS)
+      this.playerX = this.arena.resolvedX
+      this.playerZ = this.arena.resolvedZ
     }
-
     this.camera.position.set(this.playerX, PLAYER_Y, this.playerZ)
     this.aimEuler.set(this.aimPitch, this.aimYaw, 0, 'YXZ')
     this.camera.quaternion.setFromEuler(this.aimEuler)
 
-    if (this.firing) this.tryPlayerPop(nowMs)
-    if (nowMs >= this.roundStartedAt + RIVAL_REACTION_MS && session.tryPop('rival', nowMs)) {
-      this.arena.fireRival(this.camera.position, session.rivalProfile)
+    // 발사 (연사 간격)
+    if (this.firing && nowMs >= this.nextFireAt) {
+      this.nextFireAt = nowMs + Math.max(90, profile.fireIntervalMs)
+      this.camera.getWorldDirection(this.fireDir)
+      this.fireOrigin.copy(this.camera.position).addScaledVector(this.fireDir, 0.55)
+      this.arena.firePlayer(this.fireOrigin, this.fireDir, profile)
       sfx.shoot()
     }
 
-    this.arena.update(dt, this.camera.position, session.rivalProfile)
-    const playerHits = this.arena.consumePlayerImpact()
-    const rivalHits = this.arena.consumeRivalImpact()
-    if (playerHits <= 0 && rivalHits <= 0) return
+    this.arena.update(dt, this.camera.position, this.enemyProfile)
 
-    this.impactFrame.playerPopPower = rivalHits * playerProfile.popPower
-    this.impactFrame.rivalPopPower = playerHits * session.rivalProfile.popPower
-    const phase = session.resolveFrame(this.impactFrame)
-    this.arena.setRivalHealth(session.rivalHealth)
-    this.hud.setHealth(session.playerHealth, session.rivalHealth)
-    if (playerHits > 0 || rivalHits > 0) sfx.pop()
-    if (
-      phase === 'round-complete'
-      || phase === 'retry'
-      || phase === 'victory'
-      || phase === 'draw'
-    ) {
-      this.firing = false
-      this.hud.showOutcome(phase, session.roundIndex + 1, PVP_ROUND_COUNT)
-      if (phase === 'victory') sfx.star()
+    const dmg = this.arena.consumePlayerDamage()
+    if (dmg > 0) {
+      this.health = Math.max(0, this.health - dmg)
+      sfx.pop()
     }
+    const newKills = this.arena.consumeKills()
+    if (newKills > 0) {
+      this.kills += newKills
+      sfx.pop()
+    }
+    this.renderStatus()
+
+    if (this.health <= 0) this.endMatch('lost')
+    else if (this.kills >= TARGET_KILLS) this.endMatch('won')
   }
 
   get isVisible(): boolean {
@@ -194,80 +224,63 @@ export class PvpMode {
     selectedId: string | null
   } {
     return {
-      phase: this.session?.phase ?? 'lobby',
-      round: (this.session?.roundIndex ?? 0) + 1,
-      playerHealth: this.session?.playerHealth ?? 10,
-      rivalHealth: this.session?.rivalHealth ?? 10,
+      phase: this.phase,
+      round: 1,
+      playerHealth: this.health,
+      rivalHealth: this.arena.aliveEnemies,
       selectedId: this.selectedId,
     }
   }
 
   private startMatch(blasterId: string, nowMs: number): void {
-    const selected = this.ownedBlasters.find((blaster) => blaster.id === blasterId)
+    const selected = this.ownedBlasters.find((b) => b.id === blasterId)
     if (!selected) return
     this.selectedId = selected.id
     this.callbacks.onSelectBlaster(selected.id)
-    this.playerBlaster = snapshotBlaster(selected)
-    const playerProfile = profileFor(this.playerBlaster)
-    this.session = new PvpSession(playerProfile, this.rivalProfiles)
-    this.session.start(nowMs)
-    this.rebuildViewmodel(this.playerBlaster)
-    this.startRound(nowMs)
-  }
+    const snap = snapshotBlaster(selected)
+    this.playerProfile = profileFor(snap)
+    this.rebuildViewmodel(snap)
 
-  private startRound(nowMs: number): void {
-    const session = this.session
-    const playerBlaster = this.playerBlaster
-    if (!session || !playerBlaster) return
-    const rival = PVP_LOADOUTS[session.roundIndex]!
+    this.health = START_HEALTH
+    this.kills = 0
     this.playerX = 0
-    this.playerZ = PLAYER_Z
+    this.playerZ = PLAYER_START_Z
     this.targetYaw = 0
     this.targetPitch = 0
     this.aimYaw = 0
     this.aimPitch = 0
-    this.roundStartedAt = nowMs
+    this.nextFireAt = nowMs
+    this.phase = 'playing'
+    this.arena.start(0x51f15e + this.kills)
     this.configureCamera()
-    this.arena.startRound(
-      rival.blaster,
-      session.rivalProfile,
-      BASE_MATCH_SEED + session.roundIndex * 7919,
-    )
     this.viewmodel.visible = true
-    this.hud.showBattle({
-      playerName: playerBlaster.name,
-      rivalName: rival.nameKo,
-      round: session.roundIndex + 1,
-      total: PVP_ROUND_COUNT,
-      playerHealth: session.playerHealth,
-      rivalHealth: session.rivalHealth,
-      spreadDeg: session.playerProfile.spreadDeg,
-    })
-  }
-
-  private advanceRound(nowMs: number): void {
-    if (!this.session?.advance(nowMs)) return
-    this.startRound(nowMs)
+    this.hud.setVisible(false)
+    this.arenaHud.style.display = ''
+    this.outcomeEl.style.display = 'none'
+    this.renderStatus()
   }
 
   private retry(nowMs: number): void {
-    if (this.session?.phase === 'victory') {
-      if (this.selectedId) this.startMatch(this.selectedId, nowMs)
-      return
-    }
-    if (!this.session?.retry(nowMs)) return
-    this.startRound(nowMs)
+    if (this.selectedId) this.startMatch(this.selectedId, nowMs)
   }
 
-  private tryPlayerPop(nowMs: number): void {
-    const session = this.session
-    if (!session?.tryPop('player', nowMs)) return
-    this.camera.getWorldDirection(this.fireDirection)
-    this.fireOrigin
-      .copy(this.camera.position)
-      .addScaledVector(this.fireDirection, 0.55)
-    this.arena.firePlayer(this.fireOrigin, this.fireDirection, session.playerProfile)
-    sfx.shoot()
+  private endMatch(result: 'won' | 'lost'): void {
+    this.phase = result
+    this.firing = false
+    if (this.pointerLocked && document.pointerLockElement === this.canvas) document.exitPointerLock()
+    this.outcomeEl.style.display = 'flex'
+    if (result === 'won') {
+      this.outcomeTitle.textContent = '아레나 챔피언! 🏆'
+      this.outcomeDetail.textContent = `적 드론 ${TARGET_KILLS}대를 물리쳤어요! 대단해요!`
+      sfx.star()
+    } else {
+      this.outcomeTitle.textContent = '체력이 다 됐어요'
+      this.outcomeDetail.textContent = `팝 ${this.kills}대. 엄폐물 뒤에 숨으며 다시 도전해요!`
+    }
+  }
+
+  private renderStatus(): void {
+    this.statusEl.textContent = `❤️ ${this.health} · 팝 ${this.kills}/${TARGET_KILLS} · 적 ${this.arena.aliveEnemies}`
   }
 
   private rebuildViewmodel(blaster: Blaster): void {
@@ -281,7 +294,7 @@ export class PvpMode {
   }
 
   private configureCamera(): void {
-    this.camera.fov = 48
+    this.camera.fov = 52
     this.camera.position.set(this.playerX, PLAYER_Y, this.playerZ)
     this.camera.quaternion.identity()
     this.camera.updateProjectionMatrix()
@@ -289,43 +302,28 @@ export class PvpMode {
 
   private resetInput(): void {
     this.firing = false
-    this.movingLeft = false
-    this.movingRight = false
-    this.movingForward = false
-    this.movingBack = false
-    if (this.pointerLocked && document.pointerLockElement === this.canvas) {
-      document.exitPointerLock()
-    }
+    this.moveF = this.moveB = this.moveL = this.moveR = false
+    if (this.pointerLocked && document.pointerLockElement === this.canvas) document.exitPointerLock()
   }
 
   private installInput(): void {
-    // 마우스 이동 = 화면 회전. 포인터락(마우스 잠금) 상태면 movementX/Y로 자유 360° 둘러보기,
-    // 잠금 전에는 화면 위치로 대략 조준(첫 클릭 유도).
     this.canvas.addEventListener('pointermove', (event) => {
-      if (!this.active || this.session?.phase !== 'playing') return
+      if (!this.active || this.phase !== 'playing') return
       if (this.pointerLocked) {
         this.targetYaw -= event.movementX * LOOK_SENSITIVITY
-        this.targetPitch = clamp(
-          this.targetPitch - event.movementY * LOOK_SENSITIVITY,
-          -PITCH_LIMIT,
-          PITCH_LIMIT,
-        )
+        this.targetPitch = clamp(this.targetPitch - event.movementY * LOOK_SENSITIVITY, -PITCH_LIMIT, PITCH_LIMIT)
       } else {
         const rect = this.canvas.getBoundingClientRect()
         const x = ((event.clientX - rect.left) / Math.max(1, rect.width)) * 2 - 1
         const y = ((event.clientY - rect.top) / Math.max(1, rect.height)) * 2 - 1
-        this.targetYaw = -x * 0.6
-        this.targetPitch = clamp(-y * 0.35, -PITCH_LIMIT, PITCH_LIMIT)
+        this.targetYaw = -x * 0.7
+        this.targetPitch = clamp(-y * 0.4, -PITCH_LIMIT, PITCH_LIMIT)
       }
     })
     this.canvas.addEventListener('pointerdown', (event) => {
-      if (!this.active || event.button !== 0 || this.session?.phase !== 'playing') return
-      // 첫 클릭은 마우스를 화면에 잠가 자유 시야 확보, 그와 동시에 발사도 한다.
-      if (!this.pointerLocked && this.canvas.requestPointerLock) {
-        this.canvas.requestPointerLock()
-      }
+      if (!this.active || event.button !== 0 || this.phase !== 'playing') return
+      if (!this.pointerLocked && this.canvas.requestPointerLock) this.canvas.requestPointerLock()
       this.firing = true
-      this.tryPlayerPop(performance.now())
     })
     document.addEventListener('pointerlockchange', () => {
       this.pointerLocked = document.pointerLockElement === this.canvas
@@ -334,26 +332,35 @@ export class PvpMode {
       if (this.active) this.firing = false
     })
     window.addEventListener('keydown', (event) => {
-      if (!this.active) return
-      if (event.code === 'KeyW' || event.code === 'ArrowUp') this.movingForward = true
-      if (event.code === 'KeyS' || event.code === 'ArrowDown') this.movingBack = true
-      if (event.code === 'KeyA' || event.code === 'ArrowLeft') this.movingLeft = true
-      if (event.code === 'KeyD' || event.code === 'ArrowRight') this.movingRight = true
+      if (!this.active || this.phase !== 'playing') return
+      if (event.code === 'KeyW' || event.code === 'ArrowUp') this.moveF = true
+      if (event.code === 'KeyS' || event.code === 'ArrowDown') this.moveB = true
+      if (event.code === 'KeyA' || event.code === 'ArrowLeft') this.moveL = true
+      if (event.code === 'KeyD' || event.code === 'ArrowRight') this.moveR = true
       if (event.code === 'Space') {
         event.preventDefault()
         this.firing = true
-        this.tryPlayerPop(performance.now())
       }
     })
     window.addEventListener('keyup', (event) => {
       if (!this.active) return
-      if (event.code === 'KeyW' || event.code === 'ArrowUp') this.movingForward = false
-      if (event.code === 'KeyS' || event.code === 'ArrowDown') this.movingBack = false
-      if (event.code === 'KeyA' || event.code === 'ArrowLeft') this.movingLeft = false
-      if (event.code === 'KeyD' || event.code === 'ArrowRight') this.movingRight = false
+      if (event.code === 'KeyW' || event.code === 'ArrowUp') this.moveF = false
+      if (event.code === 'KeyS' || event.code === 'ArrowDown') this.moveB = false
+      if (event.code === 'KeyA' || event.code === 'ArrowLeft') this.moveL = false
+      if (event.code === 'KeyD' || event.code === 'ArrowRight') this.moveR = false
       if (event.code === 'Space') this.firing = false
     })
   }
+}
+
+function mkButton(label: string, color: string, onClick: () => void): HTMLButtonElement {
+  const b = document.createElement('button')
+  b.type = 'button'
+  b.textContent = label
+  b.style.cssText =
+    `display:block;width:100%;margin:6px 0;padding:11px;border:0;border-radius:14px;background:${color};color:#fff;font-weight:700;font-size:15px;cursor:pointer`
+  b.addEventListener('click', onClick)
+  return b
 }
 
 function profileFor(blaster: Blaster): PvpProfile {
@@ -368,12 +375,7 @@ function snapshotBlaster(source: Blaster): Blaster {
     const instance = source.parts[slot]
     if (instance) parts[slot] = snapshotInstance(instance)
   }
-  return {
-    id: source.id,
-    name: source.name,
-    createdAt: source.createdAt,
-    parts,
-  }
+  return { id: source.id, name: source.name, createdAt: source.createdAt, parts }
 }
 
 function snapshotInstance(source: PartInstance): PartInstance {
@@ -382,11 +384,7 @@ function snapshotInstance(source: PartInstance): PartInstance {
     const value = source.paint[zone]
     if (value) paint[zone] = { color: value.color, finish: value.finish }
   }
-  return {
-    partId: source.partId,
-    paint,
-    morph: { ...source.morph },
-  }
+  return { partId: source.partId, paint, morph: { ...source.morph } }
 }
 
 function clamp(value: number, min: number, max: number): number {
