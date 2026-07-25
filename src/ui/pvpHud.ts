@@ -79,7 +79,7 @@ export function createPvpHud(root: HTMLElement, cb: PvpHudCallbacks) {
   const hint = element(
     'div',
     'pvp-hint',
-    '마우스로 조준 · 누르고 발사 · A/D로 피하기',
+    '화면 클릭 → 마우스로 둘러보기 · WASD로 이동 · 클릭/스페이스로 발사',
   )
   const reticle = element('div', 'pvp-reticle')
   const spreadRing = element('span', 'pvp-spread-ring')

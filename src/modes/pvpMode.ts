@@ -20,7 +20,11 @@ import { createPvpHud } from '../ui/pvpHud.ts'
 
 const PLAYER_Y = 1.45
 const PLAYER_Z = 0.7
-const PLAYER_X_LIMIT = 4.6
+const MOVE_BOUND_X = 9
+const MOVE_BOUND_Z_MIN = -7
+const MOVE_BOUND_Z_MAX = 9
+const LOOK_SENSITIVITY = 0.0024 // 포인터락 마우스 이동(px) → 회전(rad)
+const PITCH_LIMIT = 1.2 // 위아래 시야 제한(rad)
 const RIVAL_REACTION_MS = 700
 const BASE_MATCH_SEED = 0x51f15e
 
@@ -63,11 +67,15 @@ export class PvpMode {
   private firing = false
   private movingLeft = false
   private movingRight = false
+  private movingForward = false
+  private movingBack = false
+  private pointerLocked = false
   private targetYaw = 0
   private targetPitch = 0
   private aimYaw = 0
   private aimPitch = 0
   private playerX = 0
+  private playerZ = PLAYER_Z
   private roundStartedAt = 0
 
   constructor(options: PvpModeOptions) {
@@ -123,16 +131,25 @@ export class PvpMode {
     if (!this.active || !session || session.phase !== 'playing') return
 
     const playerProfile = session.playerProfile
-    const movement = (this.movingRight ? 1 : 0) - (this.movingLeft ? 1 : 0)
-    this.playerX = clamp(
-      this.playerX + movement * playerProfile.strafeSpeed * dt,
-      -PLAYER_X_LIMIT,
-      PLAYER_X_LIMIT,
-    )
-    const follow = Math.min(1, dt * playerProfile.aimFollowPerSec)
-    this.aimYaw += (this.targetYaw - this.aimYaw) * follow
-    this.aimPitch += (this.targetPitch - this.aimPitch) * follow
-    this.camera.position.set(this.playerX, PLAYER_Y, PLAYER_Z)
+    // 화면(마우스룩)은 즉시 반영 — 마우스로 자유롭게 빙 둘러본다
+    this.aimYaw = this.targetYaw
+    this.aimPitch = clamp(this.targetPitch, -PITCH_LIMIT, PITCH_LIMIT)
+
+    // WASD 자유 이동 (보는 방향 기준): W/S=앞뒤, A/D=좌우
+    const forward = (this.movingForward ? 1 : 0) - (this.movingBack ? 1 : 0)
+    const strafe = (this.movingRight ? 1 : 0) - (this.movingLeft ? 1 : 0)
+    if (forward !== 0 || strafe !== 0) {
+      const speed = Math.max(2.6, playerProfile.strafeSpeed * 1.5)
+      const sinY = Math.sin(this.aimYaw)
+      const cosY = Math.cos(this.aimYaw)
+      const moveX = forward * -sinY + strafe * cosY
+      const moveZ = forward * -cosY + strafe * -sinY
+      const len = Math.hypot(moveX, moveZ) || 1
+      this.playerX = clamp(this.playerX + (moveX / len) * speed * dt, -MOVE_BOUND_X, MOVE_BOUND_X)
+      this.playerZ = clamp(this.playerZ + (moveZ / len) * speed * dt, MOVE_BOUND_Z_MIN, MOVE_BOUND_Z_MAX)
+    }
+
+    this.camera.position.set(this.playerX, PLAYER_Y, this.playerZ)
     this.aimEuler.set(this.aimPitch, this.aimYaw, 0, 'YXZ')
     this.camera.quaternion.setFromEuler(this.aimEuler)
 
@@ -204,6 +221,7 @@ export class PvpMode {
     if (!session || !playerBlaster) return
     const rival = PVP_LOADOUTS[session.roundIndex]!
     this.playerX = 0
+    this.playerZ = PLAYER_Z
     this.targetYaw = 0
     this.targetPitch = 0
     this.aimYaw = 0
@@ -264,7 +282,7 @@ export class PvpMode {
 
   private configureCamera(): void {
     this.camera.fov = 48
-    this.camera.position.set(this.playerX, PLAYER_Y, PLAYER_Z)
+    this.camera.position.set(this.playerX, PLAYER_Y, this.playerZ)
     this.camera.quaternion.identity()
     this.camera.updateProjectionMatrix()
   }
@@ -273,27 +291,52 @@ export class PvpMode {
     this.firing = false
     this.movingLeft = false
     this.movingRight = false
+    this.movingForward = false
+    this.movingBack = false
+    if (this.pointerLocked && document.pointerLockElement === this.canvas) {
+      document.exitPointerLock()
+    }
   }
 
   private installInput(): void {
+    // 마우스 이동 = 화면 회전. 포인터락(마우스 잠금) 상태면 movementX/Y로 자유 360° 둘러보기,
+    // 잠금 전에는 화면 위치로 대략 조준(첫 클릭 유도).
     this.canvas.addEventListener('pointermove', (event) => {
       if (!this.active || this.session?.phase !== 'playing') return
-      const rect = this.canvas.getBoundingClientRect()
-      const x = ((event.clientX - rect.left) / Math.max(1, rect.width)) * 2 - 1
-      const y = ((event.clientY - rect.top) / Math.max(1, rect.height)) * 2 - 1
-      this.targetYaw = -x * 0.48
-      this.targetPitch = clamp(-y * 0.3, -0.28, 0.3)
+      if (this.pointerLocked) {
+        this.targetYaw -= event.movementX * LOOK_SENSITIVITY
+        this.targetPitch = clamp(
+          this.targetPitch - event.movementY * LOOK_SENSITIVITY,
+          -PITCH_LIMIT,
+          PITCH_LIMIT,
+        )
+      } else {
+        const rect = this.canvas.getBoundingClientRect()
+        const x = ((event.clientX - rect.left) / Math.max(1, rect.width)) * 2 - 1
+        const y = ((event.clientY - rect.top) / Math.max(1, rect.height)) * 2 - 1
+        this.targetYaw = -x * 0.6
+        this.targetPitch = clamp(-y * 0.35, -PITCH_LIMIT, PITCH_LIMIT)
+      }
     })
     this.canvas.addEventListener('pointerdown', (event) => {
       if (!this.active || event.button !== 0 || this.session?.phase !== 'playing') return
+      // 첫 클릭은 마우스를 화면에 잠가 자유 시야 확보, 그와 동시에 발사도 한다.
+      if (!this.pointerLocked && this.canvas.requestPointerLock) {
+        this.canvas.requestPointerLock()
+      }
       this.firing = true
       this.tryPlayerPop(performance.now())
+    })
+    document.addEventListener('pointerlockchange', () => {
+      this.pointerLocked = document.pointerLockElement === this.canvas
     })
     window.addEventListener('pointerup', () => {
       if (this.active) this.firing = false
     })
     window.addEventListener('keydown', (event) => {
       if (!this.active) return
+      if (event.code === 'KeyW' || event.code === 'ArrowUp') this.movingForward = true
+      if (event.code === 'KeyS' || event.code === 'ArrowDown') this.movingBack = true
       if (event.code === 'KeyA' || event.code === 'ArrowLeft') this.movingLeft = true
       if (event.code === 'KeyD' || event.code === 'ArrowRight') this.movingRight = true
       if (event.code === 'Space') {
@@ -301,10 +344,11 @@ export class PvpMode {
         this.firing = true
         this.tryPlayerPop(performance.now())
       }
-      if (event.code === 'Escape') this.callbacks.onCollection()
     })
     window.addEventListener('keyup', (event) => {
       if (!this.active) return
+      if (event.code === 'KeyW' || event.code === 'ArrowUp') this.movingForward = false
+      if (event.code === 'KeyS' || event.code === 'ArrowDown') this.movingBack = false
       if (event.code === 'KeyA' || event.code === 'ArrowLeft') this.movingLeft = false
       if (event.code === 'KeyD' || event.code === 'ArrowRight') this.movingRight = false
       if (event.code === 'Space') this.firing = false
