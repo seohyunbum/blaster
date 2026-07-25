@@ -127,8 +127,8 @@ try {
   assert.equal(pvp.state.pvpVisible, true)
   assert.equal(pvp.pvp.phase, 'playing')
   assert.equal(pvp.pvp.playerHealth, 10)
-  assert.equal(pvp.pvp.rivalHealth, 10)
-  assert.match(await page.locator('.pvp-round').innerText(), /1 \/ 3/)
+  // 아레나 FPS: rivalHealth 는 살아있는 적 드론 수(1대1 체력 아님). 여러 적이 로밍한다.
+  assert.ok(pvp.pvp.rivalHealth >= 1, `아레나에 적 드론이 있어야 함: ${pvp.pvp.rivalHealth}`)
   assert.ok(
     pvp.info.calls <= PERFORMANCE_BUDGETS.maxSceneDrawCalls,
     `pvp draw calls ${pvp.info.calls} > ${PERFORMANCE_BUDGETS.maxSceneDrawCalls}`,
