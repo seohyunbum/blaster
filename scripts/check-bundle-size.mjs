@@ -7,7 +7,9 @@ const assetsDir = join(root, 'dist', 'assets')
 const budgets = {
   app: 120_000,
   three: 580_000,
-  totalJs: 700_000,
+  // three(580) + app(120) 외에 코드 분할된 pvpMode 청크(~30KB)가 별도로 총합에 잡힌다.
+  // 폰 터치 조종(조이스틱·쏘기 버튼) 추가로 pvp 청크가 커져 총합을 720KB로 한 단계 올린다.
+  totalJs: 720_000,
 }
 
 const jsFiles = readdirSync(assetsDir).filter((name) => name.endsWith('.js'))
