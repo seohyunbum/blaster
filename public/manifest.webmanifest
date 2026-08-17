@@ -1,0 +1,17 @@
+{
+  "name": "블래스터 공방",
+  "short_name": "블래스터",
+  "description": "나만의 장난감 블래스터를 만들고 아레나에서 대결하는 3D 게임",
+  "lang": "ko",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "fullscreen",
+  "orientation": "any",
+  "background_color": "#1a1030",
+  "theme_color": "#ff8a2b",
+  "icons": [
+    { "src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "icons/icon-512-maskable.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}
