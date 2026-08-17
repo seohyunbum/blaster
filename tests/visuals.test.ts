@@ -78,9 +78,9 @@ test('메시 수 예산(≤14) 준수 — 전 카탈로그 × 극단 morph(장�
   }
 })
 
-test('현재 카탈로그는 76종이며 슬롯별 확장 수량을 유지한다', () => {
+test('현재 카탈로그는 80종이며 슬롯별 확장 수량을 유지한다', () => {
   assert.equal(BODIES.length, 16)
-  assert.equal(PARTS.length, 60)
+  assert.equal(PARTS.length, 64)
   const counts = new Map<string, number>()
   for (const part of PARTS) counts.set(part.slot, (counts.get(part.slot) ?? 0) + 1)
   assert.deepEqual(Object.fromEntries(counts), {
@@ -89,9 +89,28 @@ test('현재 카탈로그는 76종이며 슬롯별 확장 수량을 유지한다
     sight: 8,
     grip: 10,
     stock: 10,
-    strap: 1,
+    strap: 5,
     muzzle: 8,
   })
+})
+
+test('신규 어깨끈 4종은 고유 실루엣이며 아래로 늘어지고 메시 예산(≤3)을 지킨다', () => {
+  const NEW_STRAPS = ['strap_sport', 'strap_beads', 'strap_ribbon', 'strap_star'] as const
+  const signatures = new Set<string>()
+  for (const id of ['strap_comfy', ...NEW_STRAPS]) {
+    const built = buildPart(id, { morph: {} })
+    const meshes = countMeshes(built.group)
+    assert.ok(meshes >= 2 && meshes <= 3, `${id}: 메시 수 ${meshes} (2~3 기대)`)
+    assert.ok((built.zones.primary?.length ?? 0) >= 1, `${id}: 끈 primary 존 없음`)
+    assert.ok((built.zones.accent?.length ?? 0) >= 1, `${id}: 장식 accent 존 없음`)
+    const box = new THREE.Box3().setFromObject(built.group)
+    assert.ok(box.min.y < -0.2, `${id}: 아래로 충분히 안 늘어짐 (${box.min.y})`)
+    const size = new THREE.Vector3()
+    box.getSize(size)
+    signatures.add(`${size.x.toFixed(3)}/${size.y.toFixed(3)}/${size.z.toFixed(3)}/${meshes}/${built.zones.accent?.length}`)
+    built.dispose()
+  }
+  assert.equal(signatures.size, NEW_STRAPS.length + 1, '어깨끈끼리 실루엣이 중복됨')
 })
 
 test('8슬롯 완전 장착의 파츠별 최악 메시 합은 56 이하', () => {

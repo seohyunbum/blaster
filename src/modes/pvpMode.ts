@@ -12,11 +12,13 @@ import { toPvpProfile, type PvpProfile } from '../game/pvpSession.ts'
 import type { Blaster, PartInstance, SlotType } from '../game/types.ts'
 import { fitBlasterViewmodel } from '../game/viewmodel.ts'
 import { createPvpHud } from '../ui/pvpHud.ts'
+import { createTouchControls, type TouchControls } from '../ui/touchControls.ts'
 
 const PLAYER_Y = 1.45
 const PLAYER_START_Z = 9
 const PLAYER_RADIUS = 0.45
 const LOOK_SENSITIVITY = 0.0034 // 마우스 시야 회전 감도 (화면 더 잘 돌아가게 상향)
+const TOUCH_LOOK_SENSITIVITY = 0.006 // 터치 드래그 시야 감도 (드래그가 짧아 조금 더 크게)
 const PITCH_LIMIT = 1.25
 const STAGE_COUNT = 5
 const START_HEALTH = 10
@@ -66,11 +68,14 @@ export class PvpMode {
   private phase: Phase = 'lobby'
   private active = false
 
+  private readonly touch: TouchControls
   private firing = false
   private moveF = false
   private moveB = false
   private moveL = false
   private moveR = false
+  private moveVX = 0 // 조이스틱 아날로그 좌우(-1..1)
+  private moveVY = 0 // 조이스틱 아날로그 앞뒤(-1..1)
   private pointerLocked = false
   private targetYaw = 0
   private targetPitch = 0
@@ -129,6 +134,22 @@ export class PvpMode {
     this.arenaHud.append(cross, this.statusEl, this.outcomeEl)
     options.hudHost.appendChild(this.arenaHud)
 
+    // 폰(터치) 조종 UI — 왼쪽 조이스틱·오른쪽 시야 드래그·쏘기 버튼
+    this.touch = createTouchControls(options.hudHost, {
+      onMove: (x, y) => {
+        this.moveVX = x
+        this.moveVY = y
+      },
+      onLook: (dx, dy) => {
+        if (this.phase !== 'playing') return
+        this.targetYaw -= dx * TOUCH_LOOK_SENSITIVITY
+        this.targetPitch = clamp(this.targetPitch - dy * TOUCH_LOOK_SENSITIVITY, -PITCH_LIMIT, PITCH_LIMIT)
+      },
+      onFire: (down) => {
+        if (this.phase === 'playing') this.firing = down
+      },
+    })
+
     this.enemyProfile = profileFor(PVP_LOADOUTS[0]!.blaster)
     this.installInput()
   }
@@ -168,21 +189,29 @@ export class PvpMode {
     this.aimYaw = this.targetYaw
     this.aimPitch = clamp(this.targetPitch, -PITCH_LIMIT, PITCH_LIMIT)
 
-    // WASD 이동 (보는 방향 기준) + 엄폐물/경계 충돌
-    const forward = (this.moveF ? 1 : 0) - (this.moveB ? 1 : 0)
-    const strafe = (this.moveR ? 1 : 0) - (this.moveL ? 1 : 0)
+    // 이동 (보는 방향 기준) + 엄폐물/경계 충돌.
+    // 키보드(WASD)는 -1/0/1, 조이스틱은 아날로그 — 조이스틱 입력이 있으면 그 값을 쓴다.
+    let forward = (this.moveF ? 1 : 0) - (this.moveB ? 1 : 0)
+    let strafe = (this.moveR ? 1 : 0) - (this.moveL ? 1 : 0)
+    if (this.moveVX !== 0 || this.moveVY !== 0) {
+      forward = this.moveVY
+      strafe = this.moveVX
+    }
     if (forward !== 0 || strafe !== 0) {
       const speed = Math.max(3, profile.strafeSpeed * 1.6)
       const sinY = Math.sin(this.aimYaw)
       const cosY = Math.cos(this.aimYaw)
       const mx = forward * -sinY + strafe * cosY
       const mz = forward * -cosY + strafe * -sinY
-      const len = Math.hypot(mx, mz) || 1
-      const nx = this.playerX + (mx / len) * speed * dt
-      const nz = this.playerZ + (mz / len) * speed * dt
-      this.arena.resolvePlayer(nx, nz, PLAYER_RADIUS)
-      this.playerX = this.arena.resolvedX
-      this.playerZ = this.arena.resolvedZ
+      const dirLen = Math.hypot(mx, mz)
+      if (dirLen > 1e-4) {
+        const mag = Math.min(1, Math.hypot(forward, strafe)) // 아날로그 = 살짝 밀면 천천히
+        const nx = this.playerX + (mx / dirLen) * speed * mag * dt
+        const nz = this.playerZ + (mz / dirLen) * speed * mag * dt
+        this.arena.resolvePlayer(nx, nz, PLAYER_RADIUS)
+        this.playerX = this.arena.resolvedX
+        this.playerZ = this.arena.resolvedZ
+      }
     }
     this.camera.position.set(this.playerX, PLAYER_Y, this.playerZ)
     this.aimEuler.set(this.aimPitch, this.aimYaw, 0, 'YXZ')
@@ -232,6 +261,8 @@ export class PvpMode {
   private clearRun(): void {
     this.phase = 'won'
     this.firing = false
+    this.moveVX = this.moveVY = 0
+    this.touch.setVisible(false)
     if (this.pointerLocked && document.pointerLockElement === this.canvas) document.exitPointerLock()
     this.arenaHud.style.display = 'none'
     sfx.star()
@@ -284,6 +315,7 @@ export class PvpMode {
     this.hud.setVisible(false)
     this.arenaHud.style.display = ''
     this.outcomeEl.style.display = 'none'
+    this.touch.setVisible(this.touch.isCoarse) // 폰에서만 터치 조종 표시
     this.renderStatus()
   }
 
@@ -295,6 +327,8 @@ export class PvpMode {
     // 패배 (체력 0)
     this.phase = 'lost'
     this.firing = false
+    this.moveVX = this.moveVY = 0
+    this.touch.setVisible(false)
     if (this.pointerLocked && document.pointerLockElement === this.canvas) document.exitPointerLock()
     this.outcomeEl.style.display = 'flex'
     this.outcomeTitle.textContent = '체력이 다 됐어요'
@@ -326,12 +360,15 @@ export class PvpMode {
   private resetInput(): void {
     this.firing = false
     this.moveF = this.moveB = this.moveL = this.moveR = false
+    this.moveVX = this.moveVY = 0
+    this.touch.setVisible(false)
     if (this.pointerLocked && document.pointerLockElement === this.canvas) document.exitPointerLock()
   }
 
   private installInput(): void {
     this.canvas.addEventListener('pointermove', (event) => {
       if (!this.active || this.phase !== 'playing') return
+      if (event.pointerType === 'touch') return // 터치 시야는 touchControls 가 처리
       if (this.pointerLocked) {
         this.targetYaw -= event.movementX * LOOK_SENSITIVITY
         this.targetPitch = clamp(this.targetPitch - event.movementY * LOOK_SENSITIVITY, -PITCH_LIMIT, PITCH_LIMIT)
@@ -345,6 +382,7 @@ export class PvpMode {
     })
     this.canvas.addEventListener('pointerdown', (event) => {
       if (!this.active || event.button !== 0 || this.phase !== 'playing') return
+      if (event.pointerType === 'touch') return // 폰은 쏘기 버튼으로 발사(포인터락 없음)
       if (!this.pointerLocked && this.canvas.requestPointerLock) this.canvas.requestPointerLock()
       this.firing = true
     })

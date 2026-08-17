@@ -568,12 +568,40 @@ export const PARTS: readonly PartDef[] = [
     desc: '낮은 지느러미 패드가 빠른 조준을 돕는 꼬리',
     delta: { fireRate: 1, accuracy: 1 },
   },
-  // 어깨끈 1종 — 몸통 오른쪽 측면의 앞·뒤 고리를 잇는 꾸미기 파츠
+  // 어깨끈 5종 — 몸통 오른쪽 측면의 앞·뒤 고리를 잇는 꾸미기 파츠 (각자 다른 모양)
   {
     id: 'strap_comfy',
     slot: 'strap',
     nameKo: '말랑 어깨끈',
     desc: '몸통 옆에 연결해 어깨에 편하게 멜 수 있는 폭신한 끈',
+    delta: {},
+  },
+  {
+    id: 'strap_sport',
+    slot: 'strap',
+    nameKo: '스포티 어깨끈',
+    desc: '가운데 네모 버클이 달린 날렵한 스포츠 끈',
+    delta: {},
+  },
+  {
+    id: 'strap_beads',
+    slot: 'strap',
+    nameKo: '구슬 어깨끈',
+    desc: '동글동글 구슬 두 알이 달린 귀여운 끈',
+    delta: {},
+  },
+  {
+    id: 'strap_ribbon',
+    slot: 'strap',
+    nameKo: '리본 어깨끈',
+    desc: '납작하고 넓은 밴드에 리본 매듭이 달린 끈',
+    delta: {},
+  },
+  {
+    id: 'strap_star',
+    slot: 'strap',
+    nameKo: '별 어깨끈',
+    desc: '끝에 반짝 별 참이 대롱대롱 달린 끈',
     delta: {},
   },
   // 머즐 4종 (배럴 끝에 붙음)
