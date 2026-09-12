@@ -13,7 +13,10 @@
     "check:architecture": "node scripts/check-architecture.mjs",
     "check:hotpaths": "node scripts/check-hotpaths.mjs",
     "verify": "npm run typecheck && npm run test && npm run check:architecture && npm run check:hotpaths",
-    "verify:full": "npm run verify && npm run build && npm run test:browser"
+    "verify:full": "npm run verify && npm run build && npm run test:browser",
+    "hbsy:seal": "node scripts/hbsy-release.mjs seal",
+    "hbsy:verify": "node scripts/hbsy-release.mjs verify",
+    "postbuild": "node scripts/hbsy-release.mjs seal"
   },
   "dependencies": {
     "three": "^0.184.0"

@@ -22,3 +22,7 @@
 ## 스택
 
 Three.js + Vite + TypeScript strict. 절차 생성 메시(에셋 파일 없음), 레지스트리 기반 슬롯·스테이션·발사체 확장, 세션 객체(Editor/Range/PVP), PVP 모드 지연 로딩, storage 주입형 localStorage 세이브(SAVE_VERSION 마이그레이션), 전작 `C:/ai-game-lab` 규약 계승.
+
+## 산출물 출처 검증
+
+최종 배포물의 비가시 서명·전체 파일 해시·고정 공개키 검증은 [출처 검증 안내](provenance/README.md)를 따른다. 빌드가 성공하려면 서명 검증도 통과해야 한다.

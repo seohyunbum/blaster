@@ -339,3 +339,10 @@ fitViewmodel 의 리볼버 하강량 `position.y -0.08 → -0.05` (아주 살짝
 - **어깨끈 4종 추가(총 5종)**: 스포티(네모 버클)·구슬(구슬 2알)·리본(도톰 밴드+리본 매듭)·별(별 참 대롱). 각자 전용 메시 분기. 카탈로그 76→80종(PARTS 60→64, strap 1→5).
 - **성능 계약**: 완전 장착 메시 합(56) 여유가 0이라 신규 어깨끈은 밴드1+장식2 = **메시 ≤3** 상한 준수(테스트로 강제). pvpMode 청크가 커져 totalJs 번들 예산 700→720KB로 한 단계 상향(three 562·app 109 개별 예산은 그대로, 코드분할 pvp 청크가 총합에 별도로 잡히는 구조 반영).
 - **검증**: 110테스트·typecheck·아키텍처(main 831/850)·핫패스·build(총합 701.7/720KB)·브라우저 smoke 통과. 터치 실감은 실폰 필요. 버전 17→18.
+
+
+## 2026-09-12 — 산출물 서명 연결
+
+Vite가 CRLF entry HTML에서 </script> 뒤 CRCRLF를 생성해 서명기가 bare CR을 거절함. 서명 검증을 완화하지 않고 /index.html text eol=lf를 .gitattributes에 고정하고 로컬 줄바꿈을 LF로 바꿈. 재빌드와 전체 배포물 Ed25519 서명 검증 통과. Git 정규화 기준 index.html 내용 변경 없음.
+
+근거: scripts/hbsy-release.mjs, provenance/local-verification.json. npm run verify 및 실제 npm run build 검증 완료. CI 비밀키·원격 배포는 별도 승인 완료 전까지 실행하지 않음.

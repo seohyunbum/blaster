@@ -5,3 +5,6 @@ dist/
 .vite/
 artifacts/
 .vite-dev.log
+
+# Local Python signer cache
+__pycache__/

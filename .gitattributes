@@ -1,0 +1,6 @@
+
+# Vite must not duplicate CR in the transformed entry HTML.
+/index.html text eol=lf
+# SHA-pinned signer copies must retain identical bytes on Windows and CI.
+/scripts/hbsy/*.py text eol=lf
+/scripts/hbsy/requirements.txt text eol=lf
