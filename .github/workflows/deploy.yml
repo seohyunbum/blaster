@@ -33,8 +33,12 @@ jobs:
         run: npm run verify
       - name: Install pinned signing dependency
         run: python -m pip install --disable-pip-version-check -r scripts/hbsy/requirements.txt
-      - name: Build and sign release
-        run: npm run build
+      # 빌드(tsc·vite = 외부 npm 코드)는 서명 키 없이 돌린다. --ignore-scripts 는 postbuild(서명)만
+      # 건너뛰고 build 스크립트 자체는 그대로 실행한다. 같은 서명 명령을 다음 단계에서 키와 함께 실행한다.
+      - name: Build release (no signing key)
+        run: npm run build --ignore-scripts
+      - name: Sign release
+        run: node scripts/hbsy-release.mjs seal
         env:
           HBSY_SECRET_KEY: ${{ secrets.HBSY_SECRET_KEY }}
       - name: Browser and performance gates
